@@ -31,7 +31,7 @@ Sorry for the nerd-out, but I really like this sort of thing. Learn more about <
 
 One of the major issues with those onion addresses, however, is that they are notoriously hard to remember - especially the 'newer' version (a.k.a v3 or 'prop224' onions), where the addresses are 56 characters long. 
 
-They are that long for a good reason: the cryptography involved in generating those 'newer' onion keys is stronger and this results in a longer public key ID. But they are hard to remember, and things that are hard to remember but that also require to be secure form part of what is known as <a href="https://en.wikipedia.org/wiki/Zooko%27s_triangle">'Zooko's Triangle'</a>: a trilemma that a solution usually has just two of the following three attributes:
+They are that long for a good reason: the cryptography involved in generating those 'newer' onion keys is stronger and this results in a longer public key ID. But they are hard to remember, and things that are hard to remember but that also require to be secure form part of what is known as <a href="https://en.wikipedia.org/wiki/Zooko%27s_triangle">'Zooko's Triangle'</a>: a trilemma whereby a solution usually has just two of the following three attributes:
 
  * easy to remember, 
  * secure,
@@ -49,11 +49,11 @@ Tor Browser 9.5 will now recognise a response header of 'Onion-Location' and off
 
 This won't stop them having to visit the clearnet address the first time. However, it might aid them to then bookmark the resulting site under its onion address.
 
-Tor Browser 9.5 also lets the user automatically switch to the onion address for *any* site that offers the header, without being prompted.
+Tor Browser 9.5 also offers a setting in the browser's preferences to automatically switch to the onion address for *any* site that offers the header, without being prompted.
 
 If you run a server, you can add the header to your vhost. There are a few important things to know when you do:
 
- * the header value *must* include the http:// protocol (or https:// if you're one of the few to have an SSL cert for your onion, even though they are already encrypted despite the http:// scheme)
+ * the header value *must* include the http:// scheme (or https:// if you're one of the few to have an SSL cert for your onion, even though they are already encrypted despite the http:// scheme)
  * you must only add the header in the vhost of your 'clearnet' site (don't add it to your onion's vhost) for it to be recognised by Tor Browser. I mean, there's little point adding it to a vhost that's specific to the onion address, as you'd already be on the onion address for that to kick in.
 
 Here's my entry in my clearnet Nginx vhost for mig5.net:
@@ -73,16 +73,16 @@ The Tor Browser team is experimenting in this release with maintaining a list of
 
 In this way, the new feature makes it possible to visit http://theintercept.securedrop.tor.onion and HTTPS Everywhere will convert this to the 56-character onion address for you, under the hood. The address bar stays as the shortened version, because the Tor UX team found this was the best received experience by end users. This makes sense to me, as the address bar changing to something other than what I entered, might actually cause concern for the end-user, especially given the heightened security factors usually associated with wanting to visit onion services in the first place.
 
-There are some issues with this solution in terms of long-term maintainability of such a list of 'presets', but this is an interesting experiment nonetheless. Right now, it's only being trialled with SecureDrop services, which run as onion services. This work was done as a partnership project between <a href="https://freedom.press">Freedom of the Press</a>, HTTPS Everywhere and the Tor project teams.
+There are some issues with this solution in terms of long-term maintainability of such a list of 'presets', but this is an interesting experiment nonetheless. Right now, it's only being trialled with SecureDrop services, which run as onion services. For that reason, the rules only exist for the special subdomain ending in `securedrop.tor.onion`. This work was done as a partnership project between <a href="https://freedom.press">Freedom of the Press</a>, HTTPS Everywhere and the Tor project teams.
 
 I used to <a href="https://github.com/mig5/onion-everywhere">maintain a list of HTTPSEverywhere rules</a> that converted the original 'clearnet' domain to their onion counterpart, but the underlying HTTPSEverywhere rule syntax changed and it seemed no longer possible to load in these XML-based rules anymore. Sad!
 
 
 #### What else is new?
 
-There are some other cool features such as the arrival of Client Authentication for v3/prop224 onions. This is still a convuluted process that involves generating key pairs and adding the private key to the Tor Browser's config and so on, so I won't go into that here. 
+There are some other cool features such as the arrival of Client Authentication for v3/prop224 onions. This is still a convoluted process that involves generating key pairs and adding the private key to the Tor Browser's config and so on, so I won't go into that here. 
 
-Note that you can always use 'basic' auth with v3/prop224 onions as a poor man's authenticator, and note that v3/prop224 onions descriptors (their URLs) are meant to be undiscoverable by Tor nodes on the network. 
+Note that you can always use 'basic' auth with v3/prop224 onions as a poor man's authenticator, and note that v3/prop224 onion descriptors (their URLs) are meant to be undiscoverable by Tor nodes on the network. 
 
 Obscurity is not security, though, so if keeping onion addresses truly private matters to you, it's worth the pain of setting up Client Auth. I do it for my SSH onions and a couple of web apps. <a href="https://community.torproject.org/onion-services/advanced/client-auth/">Here's how</a>.
 
