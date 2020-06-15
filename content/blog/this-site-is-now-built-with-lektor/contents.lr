@@ -17,6 +17,8 @@ body:
 
 I have re-built this site using the static content management system known as <a href="https://www.getlektor.com">Lektor</a>.
 
+If you're interested in Lektor, I've <a href="https://github.com/mig5/mig5.net">made my Lektor project a public Git repository</a>, so feel free to look at my templates and models.
+
 #### Discovering Lektor
 
 I've tried a number of lightweight static CMS over the years including Middleman, Pelican and Jekyll. But I'm really enjoying Lektor, which was introduced to me by <a href="https://micahflee.com">Micah Lee</a>, so that's what I've gone with.
