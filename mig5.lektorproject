@@ -1,5 +1,6 @@
 [project]
 name = mig5
+url = https://mig5.net
 
 [servers.production]
 name = Production
