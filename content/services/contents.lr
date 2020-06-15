@@ -1,0 +1,47 @@
+title: mig5's services and experience
+---
+body:
+
+mig5 specialises in a range of sysadmin and communication areas, some or all of which may be beneficial to your business. Here are some of those key areas:
+
+### Configuration management
+
+Bootstrapping, automating and maintaining your infrastructure with tools such as Puppet, or Ansible, keeps all your systems running in a declared, expected state. This helps enforce disciplined change management, creates an audit trail and also improves disaster recovery processes.
+
+### Infrastructure management
+
+Tools such as Terraform allow mig5 to bring the same concepts of configuration management into the provisioning, lifecycle and disaster recovery of your infrastructure or cloud services. Due to Terraform's abstraction of various cloud APIs, there's a good chance your hosting provider is supported.
+
+### Continuous deployment
+
+mig5 specialises in building zero-touch deployment tools that will automatically deploy your application from version control to your hosting platform, and also roll back changes if the deployment goes bad. Take the pain out of your delivery workflow and you'll find developers will release earlier and more often, which actually ends up decreasing the chance of regressions.
+
+### Security hardening
+
+mig5 has years of experience hardening servers, implementing intrusion detection systems and improving the security posture and compliance obligations of various organisations.
+
+mig5 has been an active contributor or sysadmin for many high profile security projects such as OnionShare and others in the Tor ecosystem.
+
+### High availability and disaster recovery
+
+mig5 has many years of experience designing and implementing high availability infrastructure to dynamically scale horizontally under load, or for resiliency in the face of unplanned outages.
+
+This includes effective loadbalancing design, autoscaling clusters, service replication (including multi-master MySQL replication) and seamless automated failover.
+
+mig5 specialises in building auto-scale clusters that can grow and shrink as your application demands.
+
+### Technical communication
+
+Communication is a niche skill mig5 can provide - something other sysop organisations lack or are too 'cookie cutter' focused to offer.
+
+mig5 specialises in helping you write effective and persuasive RFPs, setting your organisation apart from rival businesses.
+
+Let mig5 help you document ISMS and ISO27001-compliant internal processes to set your business on the path to a more secure and compliant future.
+
+### Specific Linux server tasks, troubleshooting, decision-making
+
+Bash, Python, PHP, Perl, DNS, Postfix, Dovecot, Postgres/MySQL database administration, Varnish, Squid, Memcached, HAProxy, iptables, Nagios, Munin, even BGP network administration... mig5 draws from over a decade of experience solving specific challenges that you may be facing, using a wide range of open source tools - too many to mention here.
+
+Some customers simply hire mig5 for 'advice' when they need it.
+
+Get in touch and ask whether mig5 sysadmins can help you achieve your goals.

@@ -1,0 +1,54 @@
+title: Yubikey 2FA on Qubes redux - adding a backup key
+---
+pub_date: 2016-04-15
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+yubikey
+qubes
+infosec
+2fa
+risk
+---
+body:
+
+<a href="/blog/yubikey-challenge-response-mode-qubes">Previously I wrote about adding Yubikey 2FA authentication in Qubes</a> (not for using Yubikey on remote sites, but on 2FA of your Qubes system itself), explaining a couple of the differences in my technique compared to the <a href="https://www.qubes-os.org/doc/YubiKey/">official docs</a> (e.g I don't believe in backdooring with a password in absence of your Yubikey, especially since with a usbVM, that VM can read the password as you type it! Therefore, if you don't trust your usbVM (you shouldn't), then single factor auth is never enough.)
+
+That article also goes on to properly secure the system, e.g not just on screensaver, but also the KDM or lightDM login screen, and in /etc/pam.d/login so the user can't just switch to a different TTY and login with your password (and sudo password-free account) there....
+
+So, what do you do if you've lost your Yubikey, and therefore locked yourself out? Well, if you're sensible, you have a backup Yubikey already configured with challenge-response mode on slot 2, stored somewhere safe that you can retrieve (perhaps in a safe somewhere with your mountain of cold storage bitcoin?).
+
+If so, then here's my adjusted /usr/local/bin/yubikey-auth script, which tries the first key, then the second as a backup, and finally will fail if you're using some third key (or no key).
+
+```
+#!/bin/sh
+
+KEY1="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+KEY2="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+challenge=`head -c63 /dev/urandom | xxd -c 63 -ps`
+response=`qvm-run -a --nogui -u root -p sys-usb "ykchalresp -2 -x $challenge"`
+
+function yubi_auth() {
+  correct_response=`echo $challenge | xxd -r -ps | openssl dgst -sha1 -macopt hexkey:$1 -mac HMAC -r | cut -f1 -d ' '`
+  test "x$correct_response" = "x$response"
+  return $?
+}
+
+yubi_auth $KEY1 || yubi_auth $KEY2
+```
+
+Super simple. And if you are disturbed about storing the AES keys in the script, well, you previously stored it in the file in /etc/pam.d/ that called this script, so what difference does it make?
+
+On that note, you'll want to edit your /etc/pam.d/yubico (or whatever you called it, or the login/kdm files directly if that's how you did it), and remove the KEY argument, as that's obviously no longer necessary.
+
+```
+auth required pam_exec.so expose_authtok quiet /usr/local/bin/yubikey-auth
+```
+
+Finally, note my other tiny modification to last time: I pass the -a flag to qvm-run, which automatically starts the usbVM if it's not already running. That was a lesson learned the hard way, after stopping my usbVM but then letting my screen lock automatically! Couldn't get back in :)
+

@@ -1,0 +1,58 @@
+title: Encrypting OSSEC mail notifications with GPG
+---
+pub_date: 2015-03-24
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+sysadmin
+ossec
+gpg
+infosec
+encryption
+mail
+---
+body:
+
+After reading the <a href="https://freedom.press/securedrop-files/iSEC_OTF_FPF_SecureDrop_Deliverable_v1.2.pdf">SecureDrop security audit</a> announced today, I noted that they GPG-encrypt their OSSEC mail to add an extra layer of protection over the incidents that OSSEC finds and sends alerts for. Neat idea, it never occurred to me. Even though my servers use TLS to transmit mail around, and that I run my own mail server, that traffic still has to hop through some public routes, so why not add more encryption.
+
+I looked around for how to do it and discovered <a href="https://jeroenvda.eu/2012/06/01/how-to-encrypt-ossec-email-alerts/">this guide</a> by Jeroen Vanderauwera, which accomplishes the task by running OSSEC mail through a Procmail filter which in turn executes a script to GPG-encrypt the message.
+
+That guide was almost perfect for me - thanks! - the only thing I found unnecessary was that he sends the mail to the local 'root' user, which he then adds an alias for to route back to the local 'ossec' user. Then he filters in procmail on the 'root' user part of the To: e-mail header before performing the encryption.
+
+I have a local /etc/aliases alias for 'root' already which I use for other purposes. The system sends other mail to root such as rkhunter and so on - I didn't see a reason to filter all that back through to the ossec user. It seemed easier to me to simply configure OSSEC to e-mail 'ossec@localhost' (instead of root@localhost), which Postfix finds by looking up the local account automatically anyway, and therefore finds the procmail script.
+
+My ossec .procmailrc ends up as:
+
+```
+VERBOSE=yes
+
+MAILDIR=/var/mail/
+DEFAULT=$MAILDIR
+
+LOGFILE=/var/log/procmail.log
+
+
+SUBJECT=`formail -xSubject:`
+:0 c
+*^To:.*ossec.*
+|/var/ossec/sent_encrypted_alarm.sh
+```
+
+And my ossec.conf snippet:
+
+```
+  <global>
+    <email_notification>yes</email_notification>
+    <email_to>ossec@localhost</email_to>
+    <smtp_server>localhost</smtp_server>
+  </global>
+```
+
+No need for any change to /etc/aliases. Done!
+
+The only downside I see that prevents easy GPG encryption is where an OSSEC installation sends mail to different users/mailing lists based on rule ID. For example, at some of the organisations I consult to, a Dev team might get app-level error notifications, while Ops only get server-related issues. I haven't spent the time working out how to support these different destinations (and therefore different GPG keys) via procmail.
+

@@ -1,0 +1,120 @@
+title: Deploying and managing Autoscaled Drupal applications at AWS with Terraform, Packer and Fabric
+---
+pub_date: 2016-10-11
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+devops
+terraform
+packer
+fabric
+autoscale
+drupal
+infrastructure-as-code
+---
+body:
+
+As part of a prototype/experiment for a customer, I decided to 'eat my own dogfood' and put this site onto an autoscale cluster at AWS.
+
+In doing so, I wanted to manage my infrastructure using Terraform (a configuration management tool). In addition, since the use of autoscale requires using a base image (AMI) capable of hosting the site, I wanted to build the AMI using Packer. Furthermore, I wanted to use Puppet to speed up that configuration of the AMI built by Packer.
+
+#### 'Nice to have' goals
+
+I had a few other goals also in mind:
+
+ * I wanted to still be able to deploy via Fabric/Jenkins to my cluster, without knowing in advance what instances were in the cluster (e.g not having to specify them in a list every time I wanted to deploy)
+ * I wanted to somehow ensure new instances could 'self deploy' the latest 'approved' or 'released' codebase that the existing instances already have via Fabric, where those new instances have been spawned due to autoscale events. I didn't want to have to bake an AMI for every codebase release.
+ * I wanted to capture logs in Cloudwatch rather than have to log into different servers to collate all the syslogs or nginx logs
+ * I wanted to use EFS for the NFS shared files, and somehow mount this at boot on instances that might be in different availability zones (and therefore different filesystem IDs)
+ * I wanted the cluster to build new EC2 instances every time I changed the AMI ID, whilst also swapping in the new EC2 instances and decommissioning the old EC2 instances, without any downtime.
+
+#### Abridged process for building with Terraform, Packer, Terraform
+
+In abridged format (ignoring things like getting my site actually up there and deployed, database imported into RDS etc, which I did by hand the first time), the process involved a few steps, since I discovered that to build t2.micro AMIs with Packer, which are HVM, you need to have a VPC set up in your AWS account. The obvious catch 22 being that if we are creating a VPC, we want to manage that with Terraform.
+
+So, rather awkwardly, I build 'half' of the infrastructure with Terraform, enough to obtain the VPC and Subnet IDs for Packer, then I build the Packer AMI, and then I add that AMI ID to the Terraform manifests for building my actual Autoscale cluster.
+
+Fortunately this is kind of a 'once off' - once your infrastructure is generally built, most of your subsequent time is spent just re-rolling AMIs e.g to apply configuration changes or for routine patching of the OS. Then it's just a matter of bumping the AMI ID in Terraform and 'terraform apply' to push out a new fleet of replacement EC2 instances for your cluster, all without downtime.
+
+The beauty of this approach is that you can still iterate quickly with Jenkins/Fabric based (or whatever you want) deployments to whatever cluster exists, without having to re-roll the AMIs. I operate on the assumption that I am deploying a lot more frequently than I am replacing the contents of the server's OS. Whilst the latter is still pretty fast with Packer, the former is still faster for just getting a codebase deployment out.
+
+ * build the VPC for Packer (needed for making HVM based AMIs) with Terraform, along with 'core' or 'common' infrastructure
+ * store the VPC/Subnet details in Packer json
+ * build the AMI with Packer
+ * store the AMI ID in Terraform
+ * build the rest of the infrastructure with Terraform
+
+#### Example manifests
+
+I have <a href="https://bitbucket.org/mig5/aws_terraform_packer">published an example repository</a> of the Packer (and Puppet) and Terraform manifests for getting most of this done. It may serve as a handy resource for any other Drupal devops people looking to harness the power of Terraform for managing an AutoScale environment suitable for hosting a Drupal site.
+
+Note, however, there are plenty of assumptions baked into the config, mostly to do with how I like to structure my filesystem (docroots etc), SSH keys, Nginx configuration, and so on.
+
+You should expect to have to change a fair bit of those assumptions, particularly in the Packer and the Terraform 'userdata.tpl' to suit your environment.
+
+https://bitbucket.org/mig5/aws_terraform_packer
+
+Read the README.md in the terraform, packer, and packer/puppet directories for much more information.
+
+#### Deploying with Fabric
+
+For deploying to the cluster, I wanted to 'dynamically' discover the EC2 instance hostnames, and then deploy to those with 'roles' and execute() in Fabric.
+
+Here is the little bit of magic Python (using boto3) to build that list of servers (assumes you have AWS credentials set up in ~/.aws/.credentials or equivalent, with a section [mig5], and with a couple of other assumptions built in related to the naming convention of the Autoscale Group):
+
+<pre>
+region='us-west-2'
+  session = boto3.Session(profile_name='mig5', region_name=region)
+  ec2_client = session.client('ec2', region_name=region)
+  as_client = session.client('autoscaling', region_name=region)
+
+  servers = []
+
+  # Get AutoScaling Group
+ groups = as_client.describe_auto_scaling_groups()
+  # Filter for instances only in an ASG that matches our project name
+ for group in groups['AutoScalingGroups']:
+    if group['AutoScalingGroupName'].startswith("%s-%s-asg" % (repo, buildtype)):
+      # Get a list of DNS names of instances in the autoscale group
+     for instance in group['Instances']:
+        response = ec2_client.describe_instances(InstanceIds = [instance['InstanceId']])
+        instance_dns_name = response['Reservations'][0]['Instances'][0]['NetworkInterfaces'][0]['Association']['PublicDnsName']
+        servers.append(instance_dns_name)
+
+  # Now we can define our roles
+ env.roledefs = {
+    'all': servers,
+    'primary': [ servers[0] ]
+  }
+</pre>
+
+With this method, I also define a 'primary' server (the first in the list) with which I can perform tasks during deployment that only need to happen once (such as drush updatedb, or packaging up the tarball at the end for storing in the S3 bucket for future EC2 instances spawned by Autoscale), whilst I can use the 'all' group for common tasks (such as cloning the repo itself to form the new 'build').
+
+For example:
+
+<pre>
+@roles('all')
+def clone_repo(repo, repourl, branch, build):
+  print "===> Cloning %s from %s" % (repo, repourl)
+  _sshagent_run("git clone --branch %s %s /var/www/%s_%s_%s" % (branch, repourl, repo, branch, build))
+
+@roles('primary')
+def drush_updatedb(repo, branch, build):
+  with settings(warn_only=True):
+    if sudo("su -s /bin/bash www-data -c 'cd /var/www/%s_%s_%s/www/sites/default && drush -y updatedb'" % (repo, branch, build)).failed:
+      print "Could not apply database updates! Reverting this database"
+      _revert_db(repo, branch, build)
+      raise SystemExit("Could not apply database updates! Reverted database. Site remains on previous build")
+    else:
+      sudo("su -s /bin/bash www-data -c 'cd /var/www/%s_%s_%s/www/sites/default && drush -y cc all'" % (repo, branch, build))
+</pre>
+
+#### Viewing logs
+
+I initially tried to experiment with Terraform-managing an Elasticsearch instance (with its Kibana frontend) and ship the Cloudwatch logs to Elasticsearch. It felt more trouble than it was worth, especially for my own purposes since I prefer the CLI. In the end I settled on <a href="https://github.com/jorgebastida/awslogs">AWSlogs</a> which works really nicely.
+
+Have fun!

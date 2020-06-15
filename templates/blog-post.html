@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% from "macros/blog.html" import render_blog_post %}
+{% block title %}{{ this.title }}{% endblock %}
+{% block body %}
+  {{ render_blog_post(this) }}
+{% if this.tags %}
+  <h4>Tags</h4>
+  <ul>
+    {% for t in this.tags -%}
+      <li>
+        <a href="{{ ('/blog@tag/' ~ t.lower())|url }}">
+          All posts tagged {{ t }}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

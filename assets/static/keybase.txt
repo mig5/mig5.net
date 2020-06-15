@@ -1,0 +1,73 @@
+==================================================================
+https://keybase.io/mig5
+--------------------------------------------------------------------
+
+I hereby claim:
+
+  * I am an admin of https://mig5.net
+  * I am mig5 (https://keybase.io/mig5) on keybase.
+  * I have a public key with fingerprint 0E6B 7951 85FC A187 066D  339C EEA4 341C 6D97 A0B6
+
+To do so, I am signing this object:
+
+{
+    "body": {
+        "key": {
+            "eldest_kid": "0101350b257895662e88db5805b8d2a45df5deaaf89340ad834c63406ad1414c93250a",
+            "fingerprint": "0e6b795185fca187066d339ceea4341c6d97a0b6",
+            "host": "keybase.io",
+            "key_id": "eea4341c6d97a0b6",
+            "kid": "0101350b257895662e88db5805b8d2a45df5deaaf89340ad834c63406ad1414c93250a",
+            "uid": "e0f2bd74a67c9e71add3b95ee1c0a600",
+            "username": "mig5"
+        },
+        "service": {
+            "hostname": "mig5.net",
+            "protocol": "https:"
+        },
+        "type": "web_service_binding",
+        "version": 1
+    },
+    "ctime": 1495586725,
+    "expire_in": 157680000,
+    "prev": "48707c06b2687755084005248cbca0a620b9ce0cc12550eaa5d8d8c425c38444",
+    "seqno": 32,
+    "tag": "signature"
+}
+
+which yields the signature:
+
+-----BEGIN PGP MESSAGE-----
+Version: GnuPG v2
+
+owGtUntQVFUYX3CLR4LBWMYjjCszUSLc17n37pKDgUCEGk7jJFOynXvvWbgD3IXd
+y8qCpOIDkJncEYOYePhililTyjGabEd0gmQwaFRAi4eDQhIS8tSwrHutZvqjPzv/
+nHO+8/v9vu/7nc/pt0Tn7fHLCTo0t+bIFx5d47wuPaL/QjHGW0QHZizGstHjDeWI
+yKaYsiURM2I4gRMUwHkSsJwBMAyJOE7kAYcDnhNJSAPRDEQEoZkzUDQORY6iBUY9
+MVAkaIIWDBQJcIhFYWZJzkTWPKskK5osYnjWAAgOmAVIcCzOMCJFGQSEIE3RhMCI
+BhbiPKMSsyw2jaEWx0MbipYsaky9mB6X9x/4/7nugr/y4GaSF1kaMqxgQCwBRZHi
+DQAhQsAhg+Ma0IasMsxFKjpXygRYSRSmRuySgDRTtS7+9RotI0Xl5FktikWw5KjR
+LEXJsxk1luLI02DbEW/6W8DES7Ko+qcy7MhqkywyZiRUpKBImiJBGwDgGJYEURgq
+zJOsyCRpCMAyHK4uLQ+yq5K0ajQr4AxPMhzLgs0A52gcByTNCbwA1UZInFf/ABcE
+ggQAV+0BIidyAk0CgeJomsa0nvJlC2akSLVQmKmK2qRMGSoFVoSV+FZ4hup1Ht66
+J5/w1EZL5+vz9D/zNlK47FFM5cxw1oPLdlep/p35Y8sH0pIq14Xcbth44P2sT9K8
+NmfsC3SFr7M3i0FKwMPY1wbDZutHF312iDMv7U7Rezd1PLRVPfd87Y/tt/b8dFl3
+omq0+eKZiw/Wnz+eOJAePLSz2akPavO3fNRxJ2rFjprF5KC718/F+/unP3Ul1fhN
+siM35saX0z6ex51jvaB0+oW1NS1ShJkarp97ZcD3s6TqqYaw7uzcxv7R7wpP+R5c
+crQzciFAvrZtPHWuKjqi5Wr4py62b3jj7Ny5r0/+3LYbO7RpxCL/fuzDnPCUDLgn
+bvDCWY+gOv8Q78L1L0Ze6W/U3xw5vbzrdffU4poFV8AEomemqw8QG0rbt7TJAYcr
+33TMHp0s2N+Rov+j6eTHDduW0RUJ4uqziWvvu3te7WEdtWPx3cEuOARTyqee/fzu
+jZ1vt5fdT65ubC0dZ8feSA5J254fG56A+zVtqry5cCl6b9fW799dPKiU953X7yo7
+Ykc998KeORy8pamsbJWJUQJTYV+m3/z8ZPxcUqXX1kAlqKIgaddEpIfjdIu7OPVO
+zWh377d+o63Xf1j6VeNq617XZNdEalzJgnPg1OSt2Jg1t137Noy1O2emRzKKit6a
+bA110wkv518btyfGf7C/e2nipaKeunjdipVS3Uri0W/BV1fF/eoe7PWqbXN2cvX3
+Fve6hw7phsrfk890/gk=
+=9XYf
+-----END PGP MESSAGE-----
+
+And finally, I am proving ownership of this host by posting or
+appending to this document.
+
+View my publicly-auditable identity here: https://keybase.io/mig5
+
+==================================================================

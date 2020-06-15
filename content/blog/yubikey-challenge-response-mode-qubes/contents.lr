@@ -1,0 +1,73 @@
+title: Yubikey in Challenge Response mode with Qubes
+---
+pub_date: 2015-06-18
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+yubikey
+qubes
+infosec
+2fa
+risk
+---
+body:
+
+EDIT: this is still worth/necessary reading, but <a href="/blog/yubikey-2fa-qubes-redux-adding-backup-key/">see an April 2016 update</a> where I describe further improvements, including supporting a backup key in case you've lost your first.
+
+I bought a new Yubikey for use with Qubes, but I had some issues with the challenge-response instructions in the <a href="https://www.qubes-os.org/doc/YubiKey/">documentation</a>.
+
+That is:
+
+ * I couldn't even boot my USB VM after assigning the relevant USB controller. I got error "Unable to reset PCI device 0000:00:14.0: no FLR, PM reset or bus reset available." had to disable USB3 in the BIOS, falling back to USB 2, before this would work. <a href="https://groups.google.com/d/msg/qubes-users/lBBdiKz0D4w/WrPR0COaqSEJ">Thanks to Oleg in this post</a>
+ * The script there sends 64 bytes but at first I found that I had to send 63. See <a href="http://forum.yubico.com/viewtopic.php?f=30&t=1425">this forum post</a>: "You seem to be using the hmac-lt64 option when programming the YubiKey. When this option is in effect the challenge is limited to 63 bytes, but may be less and any challenge longer than 63 bytes will be truncated to 63". So it seemed that the Yubikey Personalization tool I used, used -hmac-lt64 by default. I ended up personalising from the command line and omitted this flag, and then it was accepting 64bits as expected
+ * Marek's documentation says "In any case you can still use your login password, but do it in secure location where no one can snoop your password.". This to me sounds effectively like backdooring your own system. In my preferred approach I simply depend on the Yubikey and my password. That means even if my password is guessed/snooped, access to the machine is useless unless you have the Yubikey too. I don't want a scenario where only a password is enough (except for the disk encryption I guess) - that's as good as not having any 2FA at all.
+ * Same as the last point, I wanted to also enable the Yubikey as a mandatory requirement at the login screen (not just screensaver), ensuring that if someone somehow has my password and steals my laptop, they literally need the Yubikey off my lanyard hanging around my neck to get in. (Though kind of a moot point as they'd also need the disk encryption password, and if they have this, they can bypass all else by mounting the disk on a liveCD system and show's over)
+
+So with that in mind:
+
+ * I remove the stuff about arg 2 (the other password).
+ * I send `--nogui` flag to qvm-run in order for that transmission to work from the lightdm login screen while the USB VM is in state 'Transient' (no GUI agent running)
+ * In addition, right now I send -u root to the qvm-run command (so it runs ykchalresp as root) because for some reason at lightdm stage, it can't enumerate udev or something, so I get 'USB error: Access denied (insufficient permissions)' as a response.
+
+End result:
+
+```
+#!/bin/sh
+
+key="$1"
+
+if [ -z "$key" ]; then
+    echo "Usage: $0 <AESKEY>"
+    exit 1
+fi
+
+challenge=`head -c63 /dev/urandom | xxd -c 63 -ps`
+# You may need to adjust slot number and USB VM name here
+response=`qvm-run --nogui -u root -p sys-usb "ykchalresp -2 -x $challenge"`
+
+correct_response=`echo $challenge | xxd -r -ps | openssl dgst -sha1 -macopt hexkey:$key -mac HMAC -r | cut -f1 -d ' '`
+
+test "x$correct_response" = "x$response"
+exit $?
+```
+
+Finally, I store in /etc/pam.d/kscreensaver, /etc/pam.d/lightdm and /etc/pam.d/login:
+
+```
+auth include yubico
+```
+
+In /etc/pam.d/yubico I have:
+
+```
+auth required pam_exec.so expose_authtok quiet /usr/local/bin/yubikey-auth AESKEY
+```
+
+Now at login, console or screensaver lock screen, I enter my password as usual, but this fails unless the Yubikey is plugged in. After logging in you can of course remove the Yubikey and hang it back on your belt/round your neck/whatever!
+
+Thanks to Marek for helping me with the --nogui solution <a href="https://groups.google.com/forum/#!topic/qubes-users/eqN8E-9k66o">on the mailing list</a>.
+

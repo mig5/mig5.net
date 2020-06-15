@@ -1,0 +1,59 @@
+title: Source based load-balancing in HAproxy based on X-Forwarded-For header
+---
+pub_date: 2016-06-07
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+haproxy
+high-availability
+load-balancing
+sucuri
+infosec
+---
+body:
+
+We had some application servers behind an active/passive HAproxy loadbalancer pair (using keepalived to arbitrate the IP on failover).
+
+We needed to put a WAF product in front of the HAproxy pair (e.g Sucuri's CloudProxy or CloudFlare). This might seem odd to put a reverse proxy in front of a HAproxy pair (yo dawg, I heard you like proxies), but we need to do some funky extra munging of URLs and the like via HAproxy configuration rules, which upstream providers can't account for.
+
+Everything was working fine except we also need to use the 'source' based load-balancing algorithm in HAproxy (e.g if I am at IP 1.2.3.4 and I hit app-04, I should continue to hit app-04 on subsequent requests, without any cookies being injected either).
+
+So of course, once Sucuri was in front of HAproxy, the proxy was routing all traffic to just one of our app servers (the 'source' is now the constant same IP of Sucuri and not that of the end user anymore).
+
+So how to get it to use the original end user's IP again? Well, this is stored in the X-Forwarded-For header or X-Sucuri-ClientIP header.
+
+Turns out this can be solved, if you're using a version of HAproxy old enough (the one in Debian Wheezy Backports is good enough, 1.5.8), by balancing on a 'header' value, rather than source. The syntax is simply:
+
+<pre>
+balance hdr(X-Sucuri-ClientIP)
+</pre>
+
+Just note that it has to be set in the 'backend' (or in the defaults if you aren't using any other services in HAproxy that don't traverse the WAF and so need to still be 'balance source').
+
+Full code example:
+
+<pre>
+frontend-http
+   bind 172.15.7.9:80
+   reqadd X-Forwarded-Proto:\ http
+   default_backend app-backend
+
+frontend https
+   bind 172.15.7.9:443 ssl crt /etc/haproxy/ssl/example.pem no-sslv3
+   reqadd X-Forwarded-Proto:\ https
+   default_backend app-backend
+
+backend app-backend
+   balance hdr(X-Sucuri-ClientIP)
+   server app-01 172.30.2.1:80 check inter 5000
+   server app-02 172.30.2.2:80 check inter 5000
+   server app-03 172.30.2.3:80 check inter 5000
+   server app-04 172.30.2.4:80 check inter 5000
+</pre>
+
+A further note: make sure you don't set the 'option forwardfor' in HAproxy, which you'd typically enable to add the X-Forwarded-For header for the backend app servers. If you have the WAF in front sending this header already, HAproxy will rewrite it to be the IP of the WAF, which you probably don't want.
+

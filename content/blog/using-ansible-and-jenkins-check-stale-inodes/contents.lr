@@ -1,0 +1,82 @@
+title: Using Ansible and Jenkins to check for stale inodes
+---
+pub_date: 2015-05-20
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+devops
+ansible
+jenkins
+infrastructure-as-code
+infosec
+---
+body:
+
+As part of teaching myself Ansible this week, I've been porting some of my sysadmin toolset into playbooks. I thought I'd share one today that I call 'Stale service check'.
+
+Anyone in operations who does patching on a routine basis knows that a simple 'apt-get upgrade' is rarely enough to apply a security update; Linux uses linked libraries, and frequently when a library is updated, many services that depend on that library are not yet using the new version. OpenSSL is a classic example (remember why you had to 'reboot' to fully clear the Heartbleed vulnerability?)
+
+To avoid those applications suddenly crashing unexpectedly when a library is replaced, Linux keeps track of 'deleted' inodes referencing a library which is no longer on the system (or have been replaced). That means until those services are restarted, they continue to use a potentially vulnerable library (but at least they don't crash immediately).
+
+A reboot of course would clear this issue. Ubuntu even goes so far as to lodge a note in /var/run/reboot-required when OpenSSL is updated (which alerts you in the MOTD next time you login), because it assumes you won't actually check if the SSL libraries are still in use. But often you can simply check for these deleted inodes yourself and restart the affected applications.
+
+I have shell scripts for this, but recently rewrote it in Ansible. It's insanely simple:
+
+```
+- hosts: all
+  gather_facts: no
+  tasks:
+   - name: Check for stale processes
+     shell: lsof -n | grep DEL | egrep -v 'zero|aio|shm|SYSV' && echo 'Found stale services' && exit 1 || echo 'No stale services found'
+     sudo: true
+```
+
+Here you can see I use lsof to 'list open files', filtering specifically for DEL (deleted inodes). I then egrep to ignore a regex of inodes that I *expect* to be listed as DEL as normal, which are harmless. Examples are /dev/zero, /dev/aio, /dev/shm, and certain processes beginning with SYSV which are sometimes seen in PostgreSQL or Apache with Perl modules enabled.
+
+We exit 1 if we found any deleted inodes that don't match the whitelist, otherwise we exit 0 as normal. Here's an example:
+
+```
+PLAY [all] ********************************************************************
+
+TASK: [Check for stale processes] *********************************************
+changed: [example1.mig5.net]
+changed: [example2.mig5.net]
+changed: [example3.mig5.net]
+failed: [localhost] => {"changed": true, "cmd": "lsof -n | grep DEL | egrep -v 'zero|aio|shm|SYSV' && echo 'Found stale services' && exit 1 || echo 'No stale services found'", "delta": "0:00:00.779205", "end": "2015-05-20 07:47:45.551219", "rc": 1, "start": "2015-
+05-20 07:47:44.772014"}
+stdout:java      29502 29882    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 29883    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 29884    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 29885    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 29886    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 29910    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 29920    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 29921    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 29926    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 29927    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 30025    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+java      29502 30035    tomcat6  DEL       REG              202,1               94136 /usr/lib/x86_64-linux-gnu/libssl.so.1.0.0
+Found stale services
+changed: [example4.mig5.net]
+changed: [example5.mig5.net]
+
+PLAY RECAP ********************************************************************
+           to retry, use: --limit @/home/jenkins/stalecheck.retry
+
+example1.mig5.net            : ok=1    changed=1    unreachable=0    failed=0
+example2.mig5.net             : ok=1    changed=1    unreachable=0    failed=0
+example3.mig5.net               : ok=1    changed=1    unreachable=0    failed=0
+localhost                  : ok=0    changed=0    unreachable=0    failed=1
+example4.mig5.net           : ok=1    changed=1    unreachable=0    failed=0
+example5.mig5.net             : ok=1    changed=1    unreachable=0    failed=0
+```
+
+Ansible will iterate through all hosts and if any return an error code of 1, you'll get the output, and a return code of 2. This is perfect, then, for running this playbook nightly via, say, Jenkins or cron.
+
+I like Jenkins as a cron replacement because you can then receive e-mail or other service alerts about any stale services, but be silent about others, while still having a viewable history of previous days in Build Outputs if you wanted to check them for some reason. 'No news is good news' is my mantra, and Jenkins is good at this without having to do it via cron and redirect 'OK' results to /dev/null etc.
+
+Of course, sometimes you can't restart a service to clear the inode in question. These are typically low-level kernel processes that are depending on something. Therefore sometimes a reboot is inevitable. Processes like 'getty' that are hanging onto inodes can actually just be killed, as they will automatically respawn.

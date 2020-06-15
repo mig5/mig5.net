@@ -1,0 +1,51 @@
+title: This site is now built with Lektor
+---
+pub_date: 2020-06-14
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+lektor
+blogging
+sysadmin
+imposter-syndrome
+---
+body:
+
+I have re-built this site using the static content management system known as <a href="https://www.getlektor.com">Lektor</a>.
+
+#### Discovering Lektor
+
+I've tried a number of lightweight static CMS over the years including Middleman, Pelican and Jekyll. But I'm really enjoying Lektor, which was introduced to me by <a href="https://micahflee.com">Micah Lee</a>, so that's what I've gone with.
+
+Lektor seems super simple to use. I ran `lektor quickstart` and accepted the defaults.
+
+I looked into using Lektor <a href="https://www.getlektor.com/docs/themes/">Themes</a>, but it seemed a bit complicated if you had begun with the `quickstart` approach. So instead, I got to work porting my old site's `style.css` and tweaking the `templates/layout.html` to use its classes, and it's good enough for me!
+
+Helpfully, since my site didn't use any javascript (so that its <a href="http://yvhz3ofkv7gwf5hpzqvhonpr3gbax2cc7dee3xcnt7dmtlx2gu7vyvid.onion/">onion service</a> works nicely in Tor Browser and so my Content Security Policy is nice and lean), that was quite straightforward.
+
+I love that Lektor has simple, built-in <a href="https://www.getlektor.com/docs/deployment/">deployment methods</a>, where I can literally run `lektor build && lektor deploy` and my site is rsynced to the remote server.
+
+I still need to look into some of the plugins, such as tags, because...
+
+#### Excuse me, I have nothing to say!
+
+...the most exciting thing for me is that it entices me to start <a href="/blog">blogging</a> again. 
+
+I've carried across some old articles from https://old.mig5.net (which was once a Drupal site, since archived to HTML), but I'll leave the old one there too for now as there's some classics there (Check out <a href="https://old.mig5.net/content/awesome-screenshot-and-niki-bot.html">that time I exposed spyware in a popular Chrome screenshot plugin, working in conjunction with a bot crawler to harvest private data</a>. Niki-bot was never seen again after this made it to Hacker News.. I still wonder what I burnt by writing about it..)
+
+I've avoided blogging about sysadmin stuff for years because everyone has an opinion, many want to share (more likely retort) it, and I lose motivation when feeling like I have to justify my approach (or particularly my reticence to drink the latest Kool-Aid in the ops space). Imposter syndrome is hard enough as it is.
+
+But by the same token, participation in open source projects (and blogging about it) is what helped shape my career and reputation. No-one remembers me anymore, and not staying 'present' as an industry voice via blogs and social media etc is why. But I'm still here, I've kept working hard for hopefully-satisfied customers and been very busy for many years; chances are I've probably learned a few things during that time. I should write things down.
+
+Career-wise, my focus has shifted away from working with Drupal and into a more security-focused field where data privacy, encryption, and freedom have centre stage. I've been working with organisations like <a href="https://freedom.press">Freedom of the Press</a>, as well as <a href="https://whonix.org">Whonix</a> (though I resigned from the latter recently - maybe more on that later), where I also helped keep the QubesOS onion and mirrors running for a time. And of course, I continue to help develop <a href="https://onionshare.org">OnionShare</a> and contribute to other opensource projects. Such projects all are driven by a mission that makes the sysadmin work more fun and gives me a sense of purpose.
+
+Any writing I do here will probably be thematically about working on such infosec/privacy projects but of course still from a sysadmin's perspective.
+
+#### Speaking of which...
+
+Since May 2020, my availability opened up a bit after I moved on from a very large customer. A number of others have eagerly began to nibble up that time, but I don't really want to be <em>that</em> busy again. Having said that, I've also still got a little bit of availability right now (I'm talking 10-20 hours a month) if you are working on projects like the above and need some sysadmin help. I'm very cheap, and after 10 years I've worked out a variety of payment models (e.g retainers, pre-paid buckets, etc) to suit different sized organisations. <a href="/contact">Do get in touch</a> if you'd like to find out more.
+

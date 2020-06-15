@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Freelance Linux sysadmin/devops and infosec services">
+    <meta name="keywords" content="sysadmin,linux system administration,devops,infosec,security hardening,server administration,linux server,sysops,sysadmin consultant,freelance sysadmin">
+    <meta name="author" content="mig5 system administration">
+    <meta name="robots" content="index,follow">
+    <link rel="stylesheet" href="{{ '/static/css/style.css'|url }}">
+    <link rel="shortcut icon" href="/static/img/favicon.ico">
+    <title>{% block title %}Welcome{% endblock %} — mig5</title>
+  </head>
+<body>
+  <section class="hero">
+    <header>
+      <div class="clearfix">
+        <h1><a href="/" class="cc-active"><img width="160" src="/static/img/mig5.png" alt="mig5 system administration"></a></h1>
+        <nav>
+          <ul class="nav navbar-nav">
+            <li{% if this._path == '/' %} class="active"{% endif
+              %}><a href="{{ '/'|url }}">Home</a></li>
+            {% for href, title in [
+              ['/about', 'About'],
+              ['/services', 'Services'],
+              ['/blog', 'Blog'],
+              ['/contact', 'Contact'],
+            ] %}
+              <li{% if this.is_child_of(href) %} class="active"{% endif
+                %}><a href="{{ href|url }}">{{ title }}</a></li>
+            {% endfor %}
+          </ul>
+        </nav>
+      </div>
+    </header>
+{% if this._path == '/' %}
+  <div class="container">
+    <h1 class="editable">Sysadmin as a Service</h1>
+    <h3 class="editable">since 2007<p><a href="/contact" class="button">Say Hello</a></p></h3>
+  </div>
+{% endif%}
+  </section>
+  <section>
+    <div class="container subheader">
+      {% block body %}{% endblock %}
+    </div>
+  </section>
+  <footer>
+    <div class="container">
+       <p>ABN 53 249 567 381 | <a href="/static/mig5.asc">gpg key</a> | Tor <a href="http://yvhz3ofkv7gwf5hpzqvhonpr3gbax2cc7dee3xcnt7dmtlx2gu7vyvid.onion/">.onion</a> service [<a href="/static/onion.txt">proof</a>] | <a href="https://github.com/mig5" target="_blank">Github</a> | <a href="https://www.linkedin.com/in/mig5/" target="_blank">LinkedIn</a> | <a rel="me" href="https://rezo.mig5.net/@mig5">Mastodon</a> | <a href="https://old.mig5.net/blog.html">Old articles</a></p>
+    </div>
+  </footer>
+</body>
+</html>

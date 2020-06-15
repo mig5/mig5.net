@@ -1,0 +1,20 @@
+{% macro render_blog_post(post, from_index=false) %}
+  <div class="blog-post">
+  {% if from_index %}
+    <h4><a href="{{ post|url }}">{{ post.title }}</a></h4><p class="meta">{{ post.pub_date }}</p>
+  {% else %}
+    <h4>{{ post.title }}</h4>
+  <p class="meta">
+    written by
+    {% if post.mastodon_handle %}
+      <a href="https://rezo.mig5.net/@{{ post.mastodon_handle
+        }}">{{ post.author or post.mastodon_handle }}</a>
+    {% else %}
+      {{ post.author }}
+    {% endif %}
+    on {{ post.pub_date }}
+  </p>
+  {{ post.body }}
+  {% endif %}
+  </div>
+{% endmacro %}

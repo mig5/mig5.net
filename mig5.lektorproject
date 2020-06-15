@@ -1,0 +1,11 @@
+[project]
+name = mig5
+
+[servers.production]
+name = Production
+enabled = yes
+default = yes
+target = rsync://miguel@wolverine.mig5.net/opt/www/mig5.net?delete
+
+[packages]
+lektor-tags = 0.3

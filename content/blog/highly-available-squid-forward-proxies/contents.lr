@@ -1,0 +1,155 @@
+title: Highly-available Squid forward proxies
+---
+pub_date: 2014-01-15
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+sysadmin
+caching
+squid
+pacemaker
+high-availability
+risk
+spof
+drupal
+firewall
+---
+body:
+
+Having learnt the hard way over the years, I always make sure to implement a set of firewall rules not just inbound to my servers, but also outbound for traffic leaving them.
+
+A common behaviour of malicious users who may compromise a web app running on your server, is to upload and then potentially execute a payload that, in turn, goes and downloads more malware onto your machine from remote locations. Or, it may attempt to report back to a 'command and control' server, or be used to perform DDOS attacks or send spam on to other hosts. In effect, your machine becomes a 'stepping stone' with which to pivot and attack further targets. Unless you are super important, you or your server (or your data) aren't likely to be the end target.
+
+Thus an outbound firewall is a good second line of defense to try and prevent unauthorised traffic from leaving your machine.
+
+It is relatively easy to whitelist your server's upstream DNS providers, NTP servers and so on, in your outbound firewall rules. The IP addresses of these services rarely change.
+
+But this presents a problem. Many applications and systems are designed, these days, to fetch data from *authorised* remote servers over HTTP. A couple of examples of this are:
+
+ * Fetching software and security updates from upstream repositories (e.g APT repositories)
+ * Communicating with APIs
+
+In one case, I've seen the Drupal application use the 'Sexybookmarks' module to fetch assets such as CSS or JS from a remote Shareaholic.com and use that for constructing elements of the page on the site.
+
+These HTTP examples are problematic for outbound firewalls, because they are typically domain based, e.g 'security.ubuntu.com' or 'shareaholic.com'. It is more frequent that IP addresses change for other web apps, either as a result of Geo-IP magic, or applications behind Amazon Elastic loadbalancers that dynamically change IP all the time.
+
+Sometimes it is practical to stay up to date with whether a domain has changed IP (hint: have a look at <a href="https://code.google.com/p/dns-rr-monitor/">DNS-RR-Monitor</a>) and make the modification to your firewall to suit. Sometimes it's not.
+
+So, what to do? How to whitelist outbound HTTP traffic by domain? Well, one option is to run a Squid forward proxy on your network. Squid allows you to whitelist any number of network ranges or domains (including wildcards). Here's a brief example of the relevant Squid config:
+
+```
+acl safesites dstdomain .google.com fonts.googleapis.com github.com .newrelic.com archive.ubuntu.com security.ubuntu.com repo.percona.com updates.drupal.org pear.php.net db.local.clamav.net
+http_access allow safesites
+```
+
+So far, so good. You can configure your Drupal application to send outbound HTTP traffic via the proxy by filling in these values in the settings.php:
+
+```
+$conf['proxy_server'] = '';
+$conf['proxy_port'] = 8080;
+$conf['proxy_username'] = '';
+$conf['proxy_password'] = '';
+$conf['proxy_user_agent'] = '';
+$conf['proxy_exceptions'] = array('127.0.0.1', 'localhost');
+```
+
+Nothing too complex here. However, adding of a Squid forward proxy suddenly creates a new Single Point of Failure in your infrastructure. If all your outbound HTTP traffic is configured to route through a proxy, and that proxy goes offline, your app or system may start malfunctioning. Depending on how 'highly available' your systems need to be, this may be a problem.
+
+Therefore, it may make sense to build a small 'cluster' of proxies, and use a failover solution to ensure there is always an active proxy available to answer a request from your servers.
+
+I recently was able to configure a Pacemaker/Corosync solution to create an active/passive pair of Squid forward proxies. The primary Squid proxy holds an additional 'floating' IP address, and it's this IP address I configure on relevant systems to be the Proxy server to use.
+
+Should the primary Squid server go offline or its network stop functioning, the 'passive' Proxy server suddenly starts its Squid service and takes the floating IP for itself, sending gratuitous ARP announcements on the private LAN to let other hosts know its MAC address is now associated with this IP.
+
+Pacemaker is a rather complex beast to set up configuration for, so I thought I'd share my configs, written for the versions that come with Ubuntu 12.04 LTS. I won't go into how to install Corosync and Pacemaker, there are plenty of guides already for that on the net.
+
+/etc/corosync/corosync.conf:
+
+```
+compatibility: whitetank
+
+totem {
+        version: 2
+        secauth: on
+        threads: 0
+        rrp_mode: active
+        token: 10000
+        transport: udpu
+        interface {
+                ringnumber: 0
+                bindnetaddr: 192.168.1.0
+                mcastport: 5405
+                ttl: 1
+                member {
+                        memberaddr: 192.168.1.10
+                }
+                member {
+                        memberaddr: 192.168.1.11
+                }
+        }
+}
+logging {
+        fileline: off
+        to_stderr: no
+        to_logfile: no
+        to_syslog: yes
+        debug: off
+        logfile: /var/log/corosync/corosync.log
+        timestamp: on
+        logger_subsys {
+                subsys: AMF
+                debug: off
+        }
+}
+```
+
+/etc/corosync/service.d/pacemaker:
+
+```
+service {
+        name: pacemaker
+        ver: 1
+}
+```
+
+Pacemaker config:
+
+```
+node proxy-01.example.com \
+     attributes standby="off"
+node proxy-02.example.com \
+     attributes standby="off"
+primitive FloatingIP ocf:heartbeat:IPaddr2 \
+     params ip="192.168.1.253" cidr_netmask="24" nic="eth1" \
+     op monitor interval="30s"
+primitive Proxy ocf:heartbeat:Squid \
+     params squid_exe="/usr/sbin/squid3" squid_conf="/etc/squid3/squid.conf" squid_pidfile="/run/squid3.pid" squid_port="3128" squid_stop_timeout="30" debug_mode="v" debug_log="/var/log/cluster.log" \
+     op start interval="0" timeout="60s" \
+     op stop interval="0" timeout="120s" \
+     op monitor interval="20s" timeout="30s"
+primitive p_MailTo ocf:heartbeat:MailTo \
+     params email="alerts AT example DOT com" \
+     op monitor interval="10" timeout="10" depth="0"
+group ProxyAndIP FloatingIP Proxy
+property $id="cib-bootstrap-options" \
+     dc-version="1.1.6-9971ebba4494012a93c03b40a2c58ec0eb60f50c" \
+     cluster-infrastructure="openais" \
+     expected-quorum-votes="2" \
+     no-quorum-policy="ignore" \
+     stonith-enabled="false"
+rsc_defaults $id="rsc-options" \
+     resource-stickiness=“200"
+```
+
+Here you can see the Proxy primitive and the relevant arguments that it expects in order to manage the Squid service. Kind of weird to write 'squid_exe' on a Linux box, almost looks Windows-ish :)
+
+A couple other things to note in my configuration above:
+
+ * You can see I have configured a MailTo primitive. This is used to alert me when a failover occurs.
+ * Yes, yes, we are ignoring a lack of quorum and STONITH is disabled. I figured that a Squid service is effectively 'stateless' - it isn't a database or filesystem that is holding crucial data, so I am less worried about Split Brain. My config isn't going anywhere and I am not concerned about caching upstream HTTP results, I can just restart the VM if I need to get the cluster services back in order. Obviously if this was a DRBD cluster or similar, I would have a third node (either in standby mode for quorum-only, or otherwise), and also STONITH devices to shut the machines down (fencing) for me.
+ * In my failover tests, I discovered that Pacemaker could not actually start or shut down the Squid service properly. The 'Failed actions' output of 'crm_mon' would show something like 'Proxy_start_0 (node=proxy-01.example.com, call=3, rc=-2, status=Timed Out)'. It turns out that Pacemaker's confused if Squid isn't explicitly set to listen only on IPv4. By default, the Squid service would start up on something like :::3128. I found I had to explicitly put `http_port 0.0.0.0:3128` in the /etc/squid3/squid.conf to get it to work at all. So I guess it means it isn't IPV6-friendly. Though looking at the thread linked to above, maybe this is fixed in newer versions.
+

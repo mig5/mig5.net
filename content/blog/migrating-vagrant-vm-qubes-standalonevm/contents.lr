@@ -1,0 +1,74 @@
+title: Migrating a Vagrant VM into Qubes as StandaloneVM
+---
+pub_date: 2016-10-18
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+qubes
+infosec
+vagrant
+---
+body:
+
+I had a Vagrant VM on my other laptop that I wanted to convert into a Qubes AppVM (StandaloneVM).
+
+The disk was lazy allocated 40GB but only using about 1.3GB within the guest.
+
+The underlying disk of the Vagrant VM was a .vmdk. A lot of guides online talk about compacting VDIs, but I had to convert my VMDK first, I couldn't compact it directly.
+
+Here's how I got it into Qubes.
+
+#### Step 1) 'zerofree' the disk
+
+I launched my VM with an Ubuntu .iso as a 'live' CD. This allowed me to run 'zerofree /dev/sda1' on the underlying VM disk, since that disk can't be mounted when you run this command. (And 'telinit 1' bricked my Vagrant SSH session of course :) )
+
+#### Step 2) convert to VDI
+
+<pre>
+VBoxManage clonehd --format VDI /path/to/vmdk output.vdi
+</pre>
+
+#### Step 3) compact VDI
+
+Possibly not necessary (see step 6 below) but these are just the steps that worked for me.
+
+<pre>
+VBoxManage modifyhd output.vdi ---compact
+</pre>
+
+#### Step 4) transfer to external hard drive and attach to usbVM
+
+You'll also need to have 'qemu-utils' installed on the VM that you'll attach the external hard drive to. (At least that's the name of the package in Debian)
+
+#### Step 5) convert the vdi to a raw .img file with qemu-img
+
+<pre>
+qemu-img convert -O raw output.vdi output.img
+</pre>
+
+At this point I was dismayed to discover that the resulting output.img was still 40GB! Despite the zeroing out. Maybe the --compact step in VBoxManage didn't help, or maybe it was still necessary, not sure.
+
+In any case, it's not to worry, there is a trick to copy the image as a 'sparse' image when pulling it from the AppVM onto Dom0:
+
+#### Step 6) transfer to Dom0
+
+<pre>
+qvm-run --pass-io usbVM 'cat /path/to/output.img' | dd of=output.img conv=sparse
+</pre>
+
+After this the output.img on dom0 is only 1.4GB. Success!
+
+#### Step 7) Create the VM
+
+<pre>
+qvm-create -r output.img -H -l red newVM
+</pre>
+
+After this I have a red newVM 'StandaloneVM' in Qubes Manager that I can launch.
+
+Note that HVM (Standalone) VMs lack the usual Qubes agents and other things like networking are a problem. Have a read of the documentation for more on this.
+

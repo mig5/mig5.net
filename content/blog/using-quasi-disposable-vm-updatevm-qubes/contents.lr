@@ -1,0 +1,117 @@
+title: Using a 'quasi'-disposable VM for UpdateVM in Qubes 
+---
+pub_date: 2017-05-12
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+qubes
+infosec
+---
+body:
+
+In Qubes, the dom0 is <a href="https://www.qubes-os.org/doc/software-update-dom0/#how-is-software-updated-securely-in-dom0">updated via an 'UpdateVM'</a> which is responsible for downloading any new packages (since dom0 has no direct network access of its own).
+
+Typically the UpdateVM is your sys-firewall or any other VM you've chosen (it's configurable under Global Settings via the Qubes Manager, or with qubes-prefs from command-line).
+
+The process is therefore pretty secure since it doesn't expose dom0 to the network, just receives packages via temporary IPC between the VM and the dom0.
+
+The UpdateVM's root filesystem is presumed to be clean because the TemplateVM it is based on, is (hopefully!) clean. However, what if the UpdateVM has some sort of malware located in the /rw (persistent across reboots) part of the filesystem? And what if that malware is, in theory, able to manipulate packages or instructions as the data is sent back to the dom0.
+
+I don't know how feasible that is, if at all - the documentation states that the 'verifying' of packages occurs once the packages are back on the dom0. However, we have to assume that the act of transferring data back to the dom0 is risky, and we live in a world now where signature collisions are becoming news. Who is to say that the dom0 still can't be tricked, perhaps in some vulnerability in yum (which dom0 does end up running)? (Especially on a usually outdated Fedora...) . Yes I am paranoid - have you met a Qubes user who isn't?
+
+It occurs to me that it could be even better to further limit the attack surface by using a totally temporary VM as the UpdateVM, thereby having only a short window whereby even the persistent part of the VM exists.
+
+Unfortunately it is not possible to use the standard DispVM in Qubes to perform the updates. I tried this already with a bit of hacking but could not get it to work. <a href="https://github.com/QubesOS/qubes-issues/issues/2801">Marek says</a> that in Qubes 4 it should be trivial.
+
+In the meantime, I came up with a simple workaround: write a wrapper for the usual 'qubes-dom0-update' which:
+
+1) Temporarily provisions a new VM based on the template / netVM of your choosing
+2) Sets it as the UpdateVM
+3) Runs the updates via that UpdateVM (by issuing the standard qubes-dom0-update script which we don't modify)
+4) Shuts down and destroys the UpdateVM
+5) In case any of this surprises the Qubes global preferences, we reinstate the original UpdateVM as the default setting (in case you ever run the traditional script and otherwise get an error that the updateVM doesn't exist)
+
+Here's the script, which I run in my dom0 as ~/scripts/qubes-dom0-update. In my example, we make a VM from the debian-8 template, but set its NetVM as the Whonix gateway, so that updates happen over Tor.
+
+<pre>
+#!/bin/bash
+
+# Name for the UpdateVM
+NAME="updatevm"
+# What was the original UpdateVM?
+OLDUPDATEVM=`qubes-prefs --get updatevm`
+# Net VM we should use
+NETVM="sys-whonix"
+# Template for the updatevm
+TEMPLATE="debian-8"
+
+# Don't run as root!
+if [[ $(id -u) == 0 ]]; then
+  echo "Don't run this as root! You'll run into permissions problems."
+  exit 1
+fi
+
+# Create the UpdateVM
+qvm-create -t $TEMPLATE --label purple $NAME
+
+# Set its NetVM
+qvm-prefs -s $NAME netvm $NETVM
+
+# Set it as the updatevm
+qubes-prefs --set updatevm $NAME
+
+# Now run the main qubes-dom0-update script
+sudo /usr/bin/qubes-dom0-update "$@"
+
+# Remove the updatevm, we are done with it
+qvm-shutdown --force $NAME
+while qvm-check --running $NAME; do
+  sleep 2
+  continue
+done
+qvm-remove $NAME
+
+# Set the old UpdateVM back just for posterity
+qubes-prefs --set updatevm $OLDUPDATEVM
+</pre>
+
+The output looks like this:
+
+<pre>
+[miguel@dom0 scripts]$ ./qubes-dom0-update
+--> Using TemplateVM: debian-8
+--> Creating directory: /var/lib/qubes/appvms/updatevm
+--> Copying the template's private image: /var/lib/qubes/vm-templates/debian-8/private.img
+--> Creating volatile image: /var/lib/qubes/appvms/updatevm/volatile.img...
+--> Creating icon symlink: /var/lib/qubes/appvms/updatevm/icon.png -> /usr/share/icons/hicolor/128x128/devices/appvm-purple.png
+--> Creating default whitelisted apps list: /var/lib/qubes/appvms/updatevm/whitelisted-appmenus.list
+--> Converting Appmenu Templates...
+--> Adding Apps to the Menu...
+Using updatevm as UpdateVM to download updates for Dom0; this may take some time...
+Running command on VM: 'updatevm'...
+Starting the VM 'updatevm'...
+--> Creating volatile image: /var/lib/qubes/appvms/updatevm/volatile.img...
+--> Loading the VM (type = AppVM)...
+--> Starting Qubes DB...
+--> Setting Qubes DB info for the VM...
+--> Updating firewall rules...
+--> Starting the VM...
+--> Starting the qrexec daemon...
+Waiting for VM's qrexec agent.......connected
+Running command on VM: 'updatevm'...
+--> Starting Qubes GUId...
+Connecting to VM's GUI agent: .connected
+--> Sending monitor layout...
+--> Waiting for qubes-session...
+Checking for dom0 updates...
+No new updates available
+No updates avaliable
+Shutting down VM: 'updatevm'...
+A VM with the name updatevm is running.
+A VM with the name updatevm is not running.
+--> Removing all the files on disk...
+</pre>

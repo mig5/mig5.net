@@ -1,0 +1,91 @@
+title: Debunking myths about hiring a sysadmin consultant 
+---
+pub_date: 2011-08-26
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+consulting
+freelance
+business
+sysadmin
+risk
+---
+body:
+
+As a consultant, I have a wide range of clients that differ greatly in their appreciation / approach to hiring sysadmins to help them with their infrastructure.
+
+A common situation I find myself in is being approached by a potential client interested in my services, who at the same time, expresses doubts or wariness about whether they want my services or not!
+
+Here are some of the myths/concerns I hear, or am asked to explain/defend my service to nervous new clients:
+
+
+> I think we're too small a company to need/afford sysadmin services. 
+
+
+This is partly true, if you were pondering hiring a full time sysadmin. However, this is precisely why my service exists: by hiring a 'freelance' sysadmin, you only have to pay for when you need it.
+
+Every business differs in terms of their needs, regardless of size. As a business owner, all you need to do is make the calculations based on the cost of the service vs the value it provides. It can cost a lot more to *not* have a sysadmin, if it means you are paying a developer or someone lacking real sysadmin skills to do sysadmin tasks. If they get it wrong (through no fault of their own: you didn't pay them to become a real sysadmin), would the cost of fixing a disaster end up being more than hiring a proper sysadmin in the first place?
+
+> Sysadmins have root on the servers. I'm not comfortable giving out secure credentials/exposing data to a freelancer. 
+
+
+This is your prerogative. Again: everything is a trade-off. You should be determining whether the risk associated with giving a freelance sysadmin access to that data outweighs the value of a sysadmin protecting that data for you, through best security practices and disaster recovery procedures.
+
+The sysadmin makes his money by helping you and protecting you from attackers with less good intentions. It is not usually a viable business decision for the freelance sysadmin to steal your data if he expects to continue to get new clients! Word travels fast!
+
+> We use Linux on our servers, and it is more secure than Windows so we don't need a sysadmin 
+
+Whilst it is arguably true that Linux suffers less viruses than Windows, it is not immune from trojans, rootkits, brute-force dictionary attacks against services like SSH and IMAP/POP/SMTP, easily misconfigured as SMTP relays for spammers, anonymous HTTP proxies, and so on.
+
+Most Linux distributions also don't provide a secure firewall out-of-the-box either. You need sysadmins who understand TCP/IP and firewall tools like iptables, to secure your server from attackers.
+
+On top of that: 'Linux' is an impossibly broad term. If you are running Apache (which isn't just for Linux) as a webserver on your machine, or any other service like MySQL, FTP, these are all subject to their own vulnerabilities outside of Linux itself.
+
+Even your website could cause a vulnerability to your server through poor coding standards, cross-site-scripting or information disclosure.
+
+In short: nothing is completely secure, and security, once again, is a trade-off. It usually pays to have another set of eyes look things over and confirm to you that your business is secure *enough* for your needs.
+
+> I already use Linode or Rackspace or a similar hosting company, and they are the sysadmins. 
+
+Most cheap VPS solutions such as Linode and Rackspace are in fact what we call 'unmanaged' services. They have sysadmins, but those sysadmins are typically only responsible for maintaining the network backbone that provides 'visibility' of your server on the Internet. Most of the time they won't go the extra mile to set up your firewall, backups, or run server upgrades, if you are not paying them to do so.
+
+As a freelance sysadmin, I provide a 'middle man' between yourself and the hosting company, who liaises with both, and fills in the crucial gaps.
+
+> You're just one guy, so what happens if you get hit by a bus or something? 
+
+It is true that there is a bus factor involved in running a sole tradership, and those are risks both I and my clients take on board.
+
+That said, whilst sysadmin freelancing is something of a 'speciality' in that there aren't many doing it, it is just one other type of service being provided as a freelancer, similar to freelance web developers. There should be no reason not to be able to hire another sysadmin freelancer in the future should you need it (or should I get hit by a bus).
+
+A good sysadmin considers documentation to be a deliverable. I believe in empowering the client to achieve complex tasks by providing them with the tools to do so easily, and the documentation to understand how / why.
+
+If you are looking for a single sysadmin to solve your needs, you probably have already decided you don't want a full time sysadmin or a team of them, so you have already subconsciously accepted the risk of hiring freelancers in the first place.
+
+And if your business truly depends on the sort of 'high availability' mission-critical infrastructure (e.g losing thousands of money by the second when down), perhaps the decision to not hire a dedicated team of in-house sysadmins was the mistake already. You may be too big for casual freelance sysadmins, and I'll be the first to tell you you're on the right track to doubt whether you're mitigating your risk properly!
+
+> Servers tend to 'just work' unless something goes wrong. What are we really paying for then? 
+
+The sysadmin lives an awkward life that is prone to what I call a 'reactive' existence. Often his skills are required in dire situations when something awful has happened. This can lead to an appreciation of the service only when something is going wrong. When everything is fine, he appears an expensive commodity for an invisible service not providing 'instant' gratification to the business.
+
+Ironically, when everything is working fine, that is in actual fact the sysadmin doing his job well. The sysadmin's service to the business is maintaining silence! In other words, stability.
+
+That said, there is always work to do: reviewing logs, patching software with security updates, monitoring services, running disaster recovery procedures on backups, staying ahead of trends and applying best practices, and so on.
+
+If the sysadmin is doing his job well, he is making routine tasks automated, and giving you the ability to get things done faster than usual. This means you should be able to take on more business to fill in that time, which makes more money. Taking on more business often gives the sysadmin more tasks to do (adding new sites / configurations / users, or entire servers, which can mean maintaining and updating Puppet manifests to match).
+
+This creates a natural ecosystem: more business brings more work for the sysadmin, which brings more automation, which brings more free time, which brings more business.
+
+In this way, you can ensure you are getting value from your sysadmin by encouraging him to automate as much as possible, to give you the ability to squeeze in more and more work. Don't treat him as a liability because he's working fast: he's giving you the power to be more successful.
+
+The same argument is used for backups: they are often forgotten about because they aren't 'needed' constantly. Only when something horrible goes wrong are they turned to in a frantic panic. Like backups, sysadmins are 'reactive', but they don't have to be: they can be invested in and made part of the routine business plan, and you will benefit from it.
+
+It helps to think of a sysadmin as an insurance policy. You would call a person who owns a car without car insurance a fool when they have an accident. You'd be glad you had home and contents insurance when you get robbed. Don't be a fool by thinking you can 'get away without' a sysadmin.
+
+> OK then. What are our options? What can you offer us? 
+
+mig5 offers flexible support contracts that can be paid by the hour, month, or prepaid in advance as a 'buffer' for you to use that time to your specific needs over an agreed period. Sysadmin support doesn't have to be an entity that bleeds your business dry. Get in contact today to discuss your needs and let us help you find an affordable solution.
+

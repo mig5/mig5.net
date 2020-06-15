@@ -1,0 +1,51 @@
+title: Secure Keyboard Entry on OS X blocks interaction with Yubikeys
+---
+pub_date: 2014-07-04
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+yubikey
+infosec
+2fa
+osx
+---
+body:
+
+I recently got a few <a href="http://www.yubico.com/">Yubikeys</a> and have been implementing PAM, SSH integration and the like for two factor authentication across a range of infrastructure.
+
+I'm pleased to say that Yubico's free and opensource <a href="https://github.com/Yubico/yubikey-val">Validation Server</a>/KSM seem to work quite well, with the docs only marginally incorrect from time to time.. not bad for open source software :)
+
+However, the Yubikey in its typical form is communicating in OTP mode with either your own validation server or Yubico's free validation service, the <a href="http://www.yubico.com/products/services-software/yubicloud/">'YubiCloud'</a>. This dependency on network connectivity for validating the OTP is a problem for certain systems where a network might not be available.
+
+One example of this is, say, enabling 2-factor authentication for logging into one's own desktop computer or laptop, such as at boot time when a network connection might not yet be ready. It would be a shame to lock oneself out at that point..! Fortunately, you can configure a slot in the Yubikey to be in 'challenge response' mode, which means you store the challenge somewhere on your computer, and pressing the Yubikey issues the transaction just between the secret in that file and the key. No network required. (I realise this is a pseudo explanation; I'm not an expert on how it actually works, though I'm trying to learn!)
+
+Interested in enabling this challenge response mode on a Mac OS X running Mavericks, I came across an <a href="http://blog.avisi.nl/2014/05/06/two-factor-authentication-on-osx-a-yubikey-example/">excellent guide by Jeroen Veldhorst at Avisi</a> which explains exactly how to do this. Essentially it's a matter of:
+
+ * Personalising (flashing) a slot on your Yubikey, using the <a href="http://www.yubico.com/products/services-software/personalization-tools/">Personalisation Tool GUI</a> or equivalent CLI tools
+ * Installing <a href="https://github.com/Yubico/yubico-pam">libpam-yubico</a> (the PAM module written by Yubico) on the Mac (via Homebrew, or Macports, either work fine)
+ * Generating the challenge to the slot, which writes it out to ~/.yubico/ in your home directory
+ * Configuring various PAM modules such as screensaver, sudo and authorisation to use the Yubico module in challenge-response mode
+
+It was the third step that I had trouble with. Running 'ykpamcfg -2' from the terminal as a non-root user (e.g as my own account, kind of the point of this whole process!) was returning this 'error':
+
+```
+USB error: kIOReturnSuccess
+```
+
+(great error message, Apple! Thanks!)
+
+Took a few hours to figure out what was going on here, including trying different techniques such as re-installing the Yubikey tools from Homebrew and then Macports to see if it made a difference. It didn't.
+
+Running the command as root (or with sudo) worked, indicating some permissions problem. But this was no good, because after copying that challenge to my own account in ~/.yubico, when trying to unlock my screensaver, it would fail to authenticate and I was locked out.
+
+As it turns out, it was due to my having the setting 'Secure Keyboard Entry' turned on in my iTerm/Terminal. This is an OS X feature that aims to prevent other applications from interacting with the keyboard in use in another application. <a href="http://security.stackexchange.com/questions/47749/how-secure-is-secure-keyboard-entry-in-mac-os-xs-terminal">Much more info on this functionality is described in detail here</a>.
+
+And here's the catch: the Yubikey, for all intents and purposes, represents itself as a keyboard to the OS, and this feature prevented my terminal (and I guess, the screensaver lock screen) from interacting with it directly, unless operating as a privileged user.
+
+Turning off the feature allows me to use the Yubikey exactly as described in the Howto linked to above. It's a shame, because I like the 'Secure Keyboard Entry' feature, and it sucks to have to choose between the two. At this point I guess I choose the benefits of 2 factor auth over the risk of a keylogger getting its way onto my machine.
+
+Leaving the note here in case someone else encounters the same problem. I found <a href="http://forum.yubico.com/viewtopic.php?t=1169">several</a> <a href="https://github.com/Yubico/yubikey-personalization/issues/34">reports</a> of <a href="https://github.com/Yubico/yubikey-personalization-gui/issues/25">others</a> experiencing similar or identical issues, but no evidence that they figured it out for themselves either - I dare say this was their root cause too.

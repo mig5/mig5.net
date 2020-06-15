@@ -1,0 +1,91 @@
+title: Nagios script for VMware memory balloon size
+---
+pub_date: 2016-07-29
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+nagios
+monitoring
+vmware
+sysadmin
+---
+body:
+
+I couldn't find a Nagios plugin for checking the VMware 'memory balloon' percentage, after observing a server that due to hypervisor issues was ballooning too much. For more on that subject, you can <a href="http://www.vfrank.org/2013/09/18/understanding-vmware-ballooning/">read about it here</a>.
+
+So here's a script to do it.
+
+<pre>
+#!/bin/bash
+
+usage() {
+cat << EOF
+usage: $0 OPTIONS
+
+This script checks the VMware memory balloon and alerts if it is over
+an expected threshold.
+
+Designed for use with Nagios.
+
+OPTIONS:
+   -w   Warning percentage, in MB (default: 20)
+   -c   Critical percentage, in MB (default: 50)
+   -h   This help message
+EOF
+}
+
+# Defaults
+STATUS_OK=0
+STATUS_WARNING=1
+STATUS_CRITICAL=2
+STATUS_UNKNOWN=3
+WARNING=20
+CRITICAL=50
+
+while getopts "w:c:h" OPTION
+do
+  case $OPTION in
+    w)
+      WARNING=$OPTARG
+      ;;
+    c)
+      CRITICAL=$OPTARG
+      ;;
+    ?)
+      usage
+      exit
+      ;;
+  esac
+done
+
+TOTAL_MEM=$(free -m | awk '/^Mem:/{print $2}')
+
+# Check for the vmware-toolbox-cmd command
+if [ ! -x /usr/bin/vmware-toolbox-cmd ]; then
+  echo "UNKNOWN: vmware-toolbox-cmd binary not found!"
+  exit $STATUS_UNKNOWN
+else
+
+  # Check the balloon
+ VMWARE_CHECK=$(vmware-toolbox-cmd stat balloon | awk {'print $1'})
+ 
+  # now Check the percentage compared to total ram
+ PERCENT=$((100*$VMWARE_CHECK/$TOTAL_MEM))
+
+  # Is it lower than the warning threshold if so we are OK
+ if [ $PERCENT -lt $WARNING ]; then
+    echo "OK: VMware memory ballooning is $PERCENT%"
+    exit $STATUS_OK
+  elif [ $PERCENT -gt $CRITICAL ]; then
+    echo "CRITICAL: VMware memory ballooning is $PERCENT%"
+    exit $STATUS_CRITICAL
+  else
+    echo "WARNING: VMware memory ballooning is $PERCENT%"
+    exit $STATUS_WARNING
+  fi
+fi
+</pre>

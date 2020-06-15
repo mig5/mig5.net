@@ -1,0 +1,45 @@
+title: OSSEC frequency rules and active-response: ensure same_source_ip is set
+---
+pub_date: 2016-05-11
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+ossec
+drupal
+infosec
+sysadmin
+---
+body:
+
+I've been using the <a href="http://www.madirish.net/428">Drupal decoder for OSSEC</a> for a number of years, to detect things like brute-force login attempts as alerted by the Syslog module.
+
+```
+  <rule id="104130" level="10" frequency="4" timeframe="360">
+    <if_matched_sid>104120</if_matched_sid>
+    <description>Possible Drupal brute force attack </description>
+    <description>(high number of logins).</description>
+  </rule>
+```
+
+However, a customer noticed that one of the rules (that same brute-force rule above) contained a bug in that it seemed to 'munge' attempts from several different one IPs into the same 'frequency' event.
+
+That meant that if a user failed perhaps just twice to login, that might get included in an event with other attempts from other IPs that accumulated to 10 failures, and the user might still be blocked by active response.
+
+It turns out that you need to use the not-much-documented 'same_source_ip' parameter in the rule. As per the docs, this "Specifies that the decoded source ip must be the same. This option is used in conjunction with frequency and timeframe."
+
+You would think this would be the default, like in fail2ban, but apparently not.
+
+Here's the correct version:
+
+```
+  <rule id="104130" level="10" frequency="4" timeframe="360">
+    <if_matched_sid>104120</if_matched_sid>
+    <description>Possible Drupal brute force attack </description>
+    <description>(high number of logins).</description>
+    <same_source_ip />
+  </rule>
+```

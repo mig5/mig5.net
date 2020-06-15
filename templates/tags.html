@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+{% block title %}Posts tagged with {{ this.tag }}{% endblock %}
+{% block body %}<h4>Posts tagged with '{{ this.tag }}':</h4>
+<ul>
+  {% for i in this.items %}
+    <li><a href="{{ i|url }}">{{ i._id }}</a></li>
+  {% else %}
+    <li><em>No items.</em></li>
+  {% endfor %}
+</ul>
+{% endblock %}

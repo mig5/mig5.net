@@ -1,0 +1,77 @@
+title: Caching both HTTPS and HTTP Drupal sites behind HAproxy and Varnish
+---
+pub_date: 2016-05-11
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+sysadmin
+haproxy
+varnish
+caching
+https
+drupal
+---
+body:
+
+Scenario: you have a Drupal site behind a proxy such as HAproxy, sending traffic to a Varnish backend (which in turn sends to the Nginx or Apache backend).
+
+You want to serve cached pages from Varnish for both HTTP and HTTPS. Perhaps you've tried this and you found that behind HTTPS, your site had no CSS or JS. This is because it's serving a page object that was cached as HTTP, or it's not caching at all, but Drupal is serving the markup with http:// links and your browser won't allow that to be displayed under https:// .
+
+In any case, it is a bonus to be able to serve cached objects with https:// markup, from Varnish, even though Varnish itself doesn't understand HTTPS.
+
+You need to make three changes: one in HAproxy config, one in the Varnish VCL, and finally one in Drupal (settings.php). Here they are:
+
+##### HAproxy config change
+
+Set the X-Forwarded-Proto header in the 'frontend' definition of your HTTPS service:
+
+<pre>
+   reqadd X-Forwarded-Proto:\ https
+</pre>
+
+You can define the same for your HTTP frontend service, but obviously the value of X-Forwarded-Proto will be 'http' instead of 'https'.
+
+In this model, your frontend can send traffic to the same backend (Varnish) for both HTTP and HTTPS.
+
+<pre>
+frontend example-http
+   bind 10.0.0.1:80
+   reqadd X-Forwarded-Proto:\ http
+   default_backend varnish-backend
+
+frontend example-https
+   bind 10.0.0.1:443 ssl crt /etc/haproxy/ssl/example.pem no-sslv3
+   reqadd X-Forwarded-Proto:\ https
+   default_backend varnish-backend
+</pre>
+
+##### Varnish VCL change
+
+Ensure we maintain two separate 'caches' - one for HTTP data and one for HTTPS data. That way, we can cache the HTTPS objects that contain https:// URL markup, and not for the plaintext HTTP. This is based on the X-Forwarded-Proto header being set in the HAproxy config, above.
+
+<pre>
+  sub vcl_hash {
+   ....
+  # Include the X-Forward-Proto header, since we want to treat HTTPS
+ # requests differently, and make sure this header is always passed
+ # properly to the backend server.
+ if (req.http.X-Forwarded-Proto) {
+    hash_data(req.http.X-Forwarded-Proto);
+  }
+</pre>
+
+##### Drupal settings.php change
+
+We need to force-declare `$_SERVER['https']` to be 'on', at the Drupal layer, if the X-Forwarded-Proto header was set to 'https'.
+
+This is the change that makes Drupal apply https:// style URLs to the mark-up in the page response. Without this setting, you get a CSS/JS-less page in your browser when viewing the site under HTTPS.
+
+<pre>
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') {
+  $_SERVER['HTTPS']='on';
+}
+</pre>
