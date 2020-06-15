@@ -1,0 +1,94 @@
+title: Tor Browser 9.5 now recognises the 'Onion-Location' header
+---
+pub_date: 2020-06-15
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+infosec
+tor
+onions
+sysadmin
+---
+body:
+
+I have long had a link to the <a href="http://yvhz3ofkv7gwf5hpzqvhonpr3gbax2cc7dee3xcnt7dmtlx2gu7vyvid.onion/">onion address of this website</a> in the footer of the website itself, for those who want to use it. I also publish a <a href="/static/onion.txt">GPG-signed 'proof'</a> if you want to be (a little bit more) sure that it's valid.
+
+But a new feature has arrived in Tor Browser which means such DIY approaches to advertising your site's onion service aren't really necessary anymore.
+
+#### What's an Onion service?
+
+If you don't know about Onion Services, they are a special type of access to a website which only works over the <a href="https://torproject.org">Tor network</a>. The use of the onion service brings its own assurances in terms of encryption of the connection, as well as providing anonymity for the location of the end-user viewing the website, as well as (optionally) anonymity of the webserver's location. 
+
+There are a number of other cool side-effects of using Onions which I won't go into, suffice to say that the address of an Onion also operates as its own proof of authenticity, in that it represents a base-32 encoded version of the onion's 'master identity key', which is unique per onion address, and practically impossible to forge without the identical primary key used to run the service. In other words, the mere fact of the onion service loading under the expected address, proves with reasonable confidence that is indeed the true site being loaded, and not a 'man in the middle' attacker loading a forged site in its place, by DNS trickery or other means. It's basically cryptographically proven to be the correct service.
+
+Sorry for the nerd-out, but I really like this sort of thing. Learn more about <a href="https://community.torproject.org/onion-services/overview/">how Onion Services work here</a> if it's your thing too.
+
+#### 56 characters: eye-watering onions
+
+One of the major issues with those onion addresses, however, is that they are notoriously hard to remember - especially the 'newer' version (a.k.a v3 or 'prop224' onions), where the addresses are 56 characters long. 
+
+They are that long for a good reason: the cryptography involved in generating those 'newer' onion keys is stronger and this results in a longer public key ID. But they are hard to remember, and things that are hard to remember but that also require to be secure form part of what is known as <a href="https://en.wikipedia.org/wiki/Zooko%27s_triangle">'Zooko's Triangle'</a>: a trilemma that a solution usually has just two of the following three attributes:
+
+ * easy to remember, 
+ * secure,
+ * decentralised.
+
+Onions are already pretty decentralised (although there is a ring of 'Directory Authorities' involved), but anyone can set up their own onion. And as discussed already, the v3/prop224 style onions are quite secure. But they are hard to remember!
+
+With the <a href="https://blog.torproject.org/new-release-tor-browser-95">release of Tor Browser 9.5</a> come two really nice usability features that attempt to deal with the 'easy to remember' problem in a few different ways.
+
+#### Onion-Location
+
+The first is the recognition of the 'Onion-Location' header sent back from the website's server.
+
+Tor Browser 9.5 will now recognise a response header of 'Onion-Location' and offer the user to switch to the Onion service for better security. The user doesn't have to remember the address, they'll be prompted to load it if they've just visited the 'clearnet' address. After this, each time they load the page, they'll be redirected to the onion address instead.
+
+This won't stop them having to visit the clearnet address the first time. However, it might aid them to then bookmark the resulting site under its onion address.
+
+Tor Browser 9.5 also lets the user automatically switch to the onion address for *any* site that offers the header, without being prompted.
+
+If you run a server, you can add the header to your vhost. There are a few important things to know when you do:
+
+ * the header value *must* include the http:// protocol (or https:// if you're one of the few to have an SSL cert for your onion, even though they are already encrypted despite the http:// scheme)
+ * you must only add the header in the vhost of your 'clearnet' site (don't add it to your onion's vhost) for it to be recognised by Tor Browser. I mean, there's little point adding it to a vhost that's specific to the onion address, as you'd already be on the onion address for that to kick in.
+
+Here's my entry in my clearnet Nginx vhost for mig5.net:
+
+```
+add_header Onion-Location http://yvhz3ofkv7gwf5hpzqvhonpr3gbax2cc7dee3xcnt7dmtlx2gu7vyvid.onion$request_uri;
+
+```
+
+<a href="https://community.torproject.org/onion-services/advanced/onion-location/">More info for website operators here</a>.
+
+#### Onion Address 'shortcut' URLs
+
+If you can't afford to load a clearnet address for whatever reason, you might want to go to the Onion Address directly, but they are hard to remember.
+
+The Tor Browser team is experimenting in this release with maintaining a list of 'shortened' onion addresses in the plugin <a href="https://www.eff.org/https-everywhere">HTTPS Everywhere</a>, which ships with Tor Browser. The HTTPS Everywhere plugin is able to intercept the address you enter in the browser and rewriting the address according to a preset rule, before sending the request to the network.
+
+In this way, the new feature makes it possible to visit http://theintercept.securedrop.tor.onion and HTTPS Everywhere will convert this to the 56-character onion address for you, under the hood. The address bar stays as the shortened version, because the Tor UX team found this was the best received experience by end users. This makes sense to me, as the address bar changing to something other than what I entered, might actually cause concern for the end-user, especially given the heightened security factors usually associated with wanting to visit onion services in the first place.
+
+There are some issues with this solution in terms of long-term maintainability of such a list of 'presets', but this is an interesting experiment nonetheless. Right now, it's only being trialled with SecureDrop services, which run as onion services. This work was done as a partnership project between <a href="https://freedom.press">Freedom of the Press</a>, HTTPS Everywhere and the Tor project teams.
+
+I used to <a href="https://github.com/mig5/onion-everywhere">maintain a list of HTTPSEverywhere rules</a> that converted the original 'clearnet' domain to their onion counterpart, but the underlying HTTPSEverywhere rule syntax changed and it seemed no longer possible to load in these XML-based rules anymore. Sad!
+
+
+#### What else is new?
+
+There are some other cool features such as the arrival of Client Authentication for v3/prop224 onions. This is still a convuluted process that involves generating key pairs and adding the private key to the Tor Browser's config and so on, so I won't go into that here. 
+
+Note that you can always use 'basic' auth with v3/prop224 onions as a poor man's authenticator, and note that v3/prop224 onions descriptors (their URLs) are meant to be undiscoverable by Tor nodes on the network. 
+
+Obscurity is not security, though, so if keeping onion addresses truly private matters to you, it's worth the pain of setting up Client Auth. I do it for my SSH onions and a couple of web apps. <a href="https://community.torproject.org/onion-services/advanced/client-auth/">Here's how</a>.
+
+
+#### Now I want to set up an onion service. Can you help?
+
+Setting up an onion for your site or service is pretty simple. I've done it a lot, but there are definitely some 'gotchas', especially for services that aren't websites, such as SMTP relays and the like. Setting it up incorrectly can either be dangerous for your server, for your anonymity, or for the anonymity of your connecting users if they aren't you. If you need a hand, feel free to ask!
+
+There are, of course, excellent guides by people smarter than me already available. The <a href="https://community.torproject.org/onion-services/setup/">official docs</a> are really good, and <a href="https://riseup.net/en/security/network-security/tor/onionservices-best-practices">RiseUp also has some tips</a> for avoiding some of those gotchas, which I concur with.
