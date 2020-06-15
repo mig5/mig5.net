@@ -523,6 +523,8 @@ pre {
     font-size: 14px;
     border: 1px solid #ccc;
     padding: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 blockquote {
