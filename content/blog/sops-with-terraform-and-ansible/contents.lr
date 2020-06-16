@@ -18,7 +18,7 @@ sops
 ---
 body:
 
-If you use any sort of configuration management or 'infrastructuer as code' tool, sooner or later you run up against the need to store secrets such as passwords, API keys or other sensitive attributes in your code. Typically these 'secrets' are for injection into configuration files via templates, or authentication to a service, or environment variables being exposed to Docker containers (for example in AWS ECS Task Definitions).
+If you use any sort of configuration management or 'infrastructure as code' tool, sooner or later you run up against the need to store secrets such as passwords, API keys or other sensitive attributes in your code. Typically these 'secrets' are for injection into configuration files via templates, or authentication to a service, or environment variables being exposed to Docker containers (for example in AWS ECS Task Definitions).
 
 In addition, you might be working within a team of ops and it becomes necessary to collaborate on the same config management, which means multiple team members need access to the same secrets.
 
