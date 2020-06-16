@@ -519,6 +519,11 @@ textarea {
     color: black;
 }
 
+.meta {
+    font-size: 16px;
+    font-style: italic;
+}
+
 pre {
     font-size: 14px;
     border: 1px solid #ccc;

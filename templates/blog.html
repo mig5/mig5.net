@@ -3,6 +3,7 @@
 {% from "macros/pagination.html" import render_pagination %}
 {% block title %}{{ this.title }}{% endblock %}
 {% block body %}
+  <p class="meta">This blog is available as an <a href="/feed.xml">Atom feed</a>.</p>
   {% for child in this.pagination.items %}
     {{ render_blog_post(child, from_index=true) }}
   {% endfor %}
