@@ -1,0 +1,96 @@
+title: SOPS with Terraform and Ansible
+---
+pub_date: 2020-06-16
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+sysadmin
+devops
+infosec
+terraform
+ansible
+infrastructure-as-code
+sops
+---
+body:
+
+If you use any sort of configuration management or 'infrastructuer as code' tool, sooner or later you run up against the need to store secrets such as passwords, API keys or other sensitive attributes in your code. Typically these 'secrets' are for injection into configuration files via templates, or authentication to a service, or environment variables being exposed to Docker containers (for example in AWS ECS Task Definitions).
+
+In addition, you might be working within a team of ops and it becomes necessary to collaborate on the same config management, which means multiple team members need access to the same secrets.
+
+#### Introducing SOPS
+
+<a href="https://github.com/mozilla/sops">SOPS</a> is a tool written by Mozilla which is capable of encrypting values in YAML files with GPG keys or other tools such as AWS KMS.
+
+After installing SOPS, you can use the command `sops` in a terminal to open a file as if you were opening it with an editor such as Vim. In effect it is a wrapper around your usual editor. You can then write a YAML file as normal.
+
+The difference is that upon saving the file, SOPS will encrypt the file with a unique 'data key'. It will then store the data key in the metadata of the file itself, encrypting it with your own GPG key (for example). This allows your GPG key to decrypt the metadata to obtain the data key, and then SOPS uses the data key to decrypt the file's actual contents.
+
+The beauty of SOPS is that you can configure it to encrypt the file with multiple team members' keys, so that each member can work with the file. If you need to remove a user's key, you can do so and then rotate the master key.
+
+And what's more, from a disaster recovery perspective, if one team member loses their key or goes missing, another team member can probably still decrypt the file.
+
+The use of a `.sops.yaml` file in the directory where SOPS files exist, can be used to assign different GPG fingerprints depending on <a href="https://en.wikipedia.org/wiki/Role-based_access_control">role-based access</a>. For example, maybe you allow junior sysadmins to only modify the secrets of your 'staging' folder's Terraform code, but not production. Similarly, maybe you want to hire a temporary contractor but not give them access to all your infrastructure's secrets, just those of a specific bit of kit or service they're working on. You can do all this with careful control of `.sops.yaml` config files and path-based RBAC.
+
+Rather than write a manual on how to use SOPS, I recommend you view the official page as above, which contains plenty of examples and more information on the security design. 
+
+What I'm particularly interested in is that you can integrate SOPS with infrastructure and config management tools such as Terraform and Ansible, for storing your secrets.
+
+#### Integrating with Terraform
+
+To use SOPS with Terraform, download the contributed SOPS plugin <a href="https://github.com/carlpett/terraform-provider-sops">from Github</a> and store it in `~/.terraform.d/plugins`.
+
+You can then define a YAML file with the `data` statement like so (note: this is Terraform 0.11 syntax, see the Github page for 0.12 syntax):
+
+```
+provider "sops" {}
+
+data "sops_file" "example" {
+  source_file = "example.yaml"
+}
+```
+
+Let's say that `example.yaml` SOPS file has a key called 'foo' and a value of 'bar'. You can reference that key's value in Terraform code somewhere like this:
+
+```
+${data.sops_file.example.data.foo}"
+```
+
+When you run a Terraform command like `terraform plan` or `terraform apply`, Terraform will decrypt the SOPS file on-the-fly in order to enumerate the secret. Really neat. Remember, though, that the secret still ends up in your state, so be sure to protect it as best you can.
+
+#### Integrating with Ansible
+
+SOPS can also be integrated with Ansible as a 'vars plugin'. Rather than re-invent the wheel, have a read of <a href="https://kushaldas.in/posts/using-sops-with-ansible-for-vars-encryption.html">this article by Kushal Das</a> which explains how to do it. The full code to the SOPS plugin file is provided, you can drop it into your own Ansible working directory in the `vars_plugins/` folder, assuming that's the name you've set in `ansible.cfg` for the `vars_plugins` setting.
+
+<a href="https://github.com/ansible/ansible/issues/36982">There is also a Github issue about it here</a>, where the original author of the version Kushal shows, Conor Schaefer of <a href="https://freedom.press">Freedom of the Press</a>, offers the original code. Another implementation of SOPS and Ansible which differs from this model (but which I can't vouch for, as I haven't tried it) is also being worked on <a href="https://github.com/ansible/ansible/pull/59641">as a PR here</a>.
+
+Again, the beauty of this solution is that when you run `ansible-playbook`, the plugin to Ansible will discover and decrypt the SOPS files 'on the fly', and add the values into the internal inventory variables whilst the playbook is running. This ensures that secrets are able to get injected into templates etc without any further work from the end user.
+
+#### Diffing a SOPS file in Git
+
+One challenge with working with SOPS is that a diff like a Git PR is *enormously* hard to read, because by default, it's all just encrypted text. There is also a lot of distraction from the metadata of the SOPS file having changed as well.
+
+Don't get me started on dealing with a conflict to a SOPS file! It's a massive nightmare.. ultimately it's easier to reset back to a known good state and carefully work with the other team member to get your respective changes into the file other than relying on git to figure it out..
+
+However, it's possible to tweak your `~/.gitconfig` a bit to make the diff decrypt via SOPS, so that you can see the underlying, decrypted changes, but it also involves adding a `~/.gitattributes` file to the repository in question. See <a href="https://github.com/mozilla/sops#48showing-diffs-in-cleartext-in-git">this section in the SOPS manual for how</a>.
+
+
+#### Using SOPS with QubesOS and Split-GPG
+
+If you use <a href="https://qubes-os.org">Qubes OS</a> and Split-GPG, you can set this environment variable in your terminal (e.g the `~/.bashrc`) to use the `qubes-gpg-client-wrapper` as the GPG command:
+
+```
+export SOPS_GPG_EXEC='qubes-gpg-client-wrapper'
+```
+
+I also set my GPG fingerprint beneath that:
+
+```
+export SOPS_PGP_FP="0E6B795185FCA187066D339CEEA4341C6D97A0B6"
+```
+
+Now SOPS will talk via the qrexec backplane to your GPG vault (remember you need to define the QUBES_GPG_DOMAIN too, e.g via `/rw/config/gpg-split-domain` <a href="https://www.qubes-os.org/doc/split-gpg/#advanced-configuration">per the Qubes OS docs</a>).
