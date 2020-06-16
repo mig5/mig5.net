@@ -2,10 +2,14 @@ title: mig5 system administration
 ---
 body:
 
-### Sysadmin as a Service, since 2007.
+<h3>Sysadmin as a Service, since 2007</h3>
 
-mig5 is a freelance Linux sysadmin service, consulting to organisations all around the world to help them better administer their infrastructure.
+<div class="frontpage">
+<p>mig5 is a Linux sysadmin consultation service, working with organisations all around the world to help them administer their infrastructure.</p>
 
-We specialise in infrastructure automation and orchestration, the implementation of effective config management tools and workflows, bespoke zero-touch deployment pipelines, and security hardening.
+<p>A leading expert in infrastructure automation and orchestration, config management, bespoke zero-touch deployment pipelines, and security hardening, mig5 can also assist with disaster recovery design, achieving ISO27001 compliance, technical writing and mentoring.</p>
 
-If you need an expert to help maintain your infrastructure stack on a casual, part-time or retainer basis, that's exactly what we do.
+<h3>Find out more or request a quote</h3>
+
+If you need an expert to help maintain your infrastructure stack, <a href="/contact/">get in touch</a> to see how mig5 can help.
+</div>
