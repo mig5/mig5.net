@@ -1,0 +1,292 @@
+title: Simple Nagios config management with Ansible
+---
+pub_date: 2020-06-16
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+sysadmin
+ansible
+infrastructure-as-code
+nagios
+monitoring
+---
+body:
+
+Nagios is a very config-file heavy application, and I have seen some ineffective config definitions for it in the past.
+
+Particularly I've seen a method of adding comma-delimited lists of hosts to the 'hostgroup' definitions via their `members` attribute. The reverse works better: add a list of `hostgroups` to your host definitions. Then it becomes easier to template-ise both files.
+
+Here's how I do it in Ansible for hostgroups, services, hosts, contacts and the htpasswd file.
+
+I'm not going to show all the Nagios role, but these are the pertinent parts, i.e the ones that deal with Nagios objects that you're likely to want to change more often (hosts, services, contacts).
+
+#### Ansible tasks
+
+```
+- name: Write nagios config files for defined hosts.
+  template:
+    src: host.cfg.j2
+    dest: "/etc/nagios3/conf.d/host_{{ item.slug }}.cfg"
+    owner: root
+    group: root
+    mode: "0644"
+  with_items: "{{ nagios_hosts }}"
+  notify: restart nagios3
+  tags: hosts
+
+- name: Write nagios config files for defined contacts, services and hostgroups.
+  template:
+    src: "{{ item }}.j2"
+    dest: "/etc/nagios3/conf.d/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  with_items:
+    - contacts.cfg
+    - hostgroups.cfg
+    - services.cfg
+  tags: services
+  notify: restart nagios3
+
+- name: Write nagios htpasswd users file
+  template:
+    src: htpasswd.users.j2
+    dest: /etc/nagios3/htpasswd.users
+    owner: root
+    group: root
+    mode: "0644"
+  tags: htpasswd
+```
+
+You can see that for these files, we loop over the names and corresponding template files with the `with_items` statement. This saves a drastic amount of code in Ansible.
+
+#### Ansible templates
+
+These are the templates. You can see, again, that they are kept quite lean, looping over a list of keys, some which have many attributes.
+
+##### host.cfg.j2
+
+This is the config file that each host will get, in `/etc/nagios3/conf.d/` with a `host_` prefix in the filename.
+
+```
+{% set nagios_host = item %}
+define host {{ "{" }}
+ use                    generic-host
+ host_name              {{ nagios_host.slug }}
+ alias                  {{ nagios_host.slug }}
+ address                {{ nagios_host.address }}
+ hostgroups             {{ nagios_host.hostgroups }}
+ contact_groups         {{ nagios_host.contact_groups }}
+{{ "}" }}
+```
+
+##### contacts.cfg
+
+Our list of contacts and contactgroups.
+
+```
+{% for nagios_contact in nagios_contacts %}
+define contact {{ "{" }}
+        contact_name                    {{ nagios_contact.slug }}
+        alias                           {{ nagios_contact.slug }}
+        service_notification_period     {{ nagios_contact.service_notification_period }}
+        host_notification_period        {{ nagios_contact.host_notification_period }}
+        service_notification_options    {{ nagios_contact.service_notification_options }}
+        host_notification_options       {{ nagios_contact.host_notification_options }}
+        service_notification_commands   {{ nagios_contact.service_notification_commands }}
+        host_notification_commands      {{ nagios_contact.host_notification_commands }}
+        email                           {{ nagios_contact.email }}
+        {% if 'pushover_userkey' in nagios_contact %}
+_pushover_userkey               {{ nagios_contact.pushover_userkey }}
+        {% endif -%}
+        {% if 'pushover_appkey' in nagios_contact %}
+_pushover_appkey                {{ nagios_contact.pushover_appkey }}
+        {% endif -%}
+{{ "}" }}
+{% endfor %}
+
+{% for nagios_contactgroup in nagios_contactgroups %}
+define contactgroup{{ "{" }}
+        contactgroup_name       {{ nagios_contactgroup.slug }}
+        alias                   {{ nagios_contactgroup.alias }}
+        members                 {{ nagios_contactgroup.members }}
+{{ "}" }}
+{% endfor %}
+```
+
+##### hostgroups.cfg
+
+A list of hostgroups
+
+```
+{% for nagios_hostgroup in nagios_hostgroups %}
+define hostgroup {{ "{" }}
+ hostgroup_name         {{ nagios_hostgroup.hostgroup_name }}
+ alias                  {{ nagios_hostgroup.alias }}
+{{ "}" }}
+{% endfor %}
+```
+
+##### services.cfg
+
+A list of services, attached to those hostgroups
+
+```
+{% for nagios_service in nagios_services %}
+define service {{ "{" }}
+ hostgroup_name         {{ nagios_service.hostgroup_name }}
+ service_description    {{ nagios_service.service_description }}
+ check_command          {{ nagios_service.check_command }}
+ use                    {{ nagios_service.use }}
+{{ "}" }}
+{% endfor %}
+```
+
+#### Ansible inventory
+
+Now let's look at the fun part: the inventory, where we define all the objects that will get inserted into the files above.
+
+##### Hosts
+
+```
+nagios_hosts:
+-   slug: example1.mig5.net
+    address: 192.168.1.10
+    hostgroups: linux-servers, ssh-servers, nginx-servers, smtp-servers
+    contact_groups: sysadmins
+-   slug: example2.mig5.net
+    address: 192.168.1.11
+    hostgroups: linux-servers, ssh-servers, mysql-servers
+    contact_groups: developers
+-   slug: example3.mig5.net
+    address: 192.168.1.12
+    hostgroups: linux-servers, haproxy-servers
+    contact_groups: sysadmins
+```
+
+##### Hostgroups:
+
+```
+nagios_hostgroups:
+-   hostgroup_name: linux-servers
+    alias: Linux servers
+-   hostgroup_name: ssh-servers
+    alias: SSH servers
+-   hostgroup_name: apache-servers
+    alias: Apache HTTP servers
+-   hostgroup_name: nginx-servers
+    alias: Nginx HTTP servers
+-   hostgroup_name: smtp-servers
+    alias: SMTP servers
+-   hostgroup_name: mysql-servers
+    alias: MySQL servers
+-   hostgroup_name: haproxy-servers
+    alias: HAProxy servers
+```
+
+##### Services:
+
+The services are where we attach check commands to.
+
+```
+nagios_services:
+-   hostgroup_name: apache-servers, nginx-servers
+    service_description: HTTP
+    check_command: check_http
+    use: generic-service
+-   hostgroup_name: ssh-servers
+    service_description: SSH
+    check_command: check_ssh
+    use: generic-service
+-   hostgroup_name: linux-servers
+    service_description: Load
+    check_command: check_nrpe_1arg!check_load
+    use: generic-service
+-   hostgroup_name: linux-servers
+    service_description: RAM
+    check_command: check_nrpe_1arg!check_mem
+    use: generic-service
+-   hostgroup_name: linux-servers
+    service_description: Processes
+    check_command: check_nrpe_1arg!check_total_procs
+    use: generic-service
+-   hostgroup_name: linux-servers
+    service_description: Zombie Processes
+    check_command: check_nrpe_1arg!check_zombie_procs
+    use: generic-service
+-   hostgroup_name: linux-servers
+    service_description: Users
+    check_command: check_nrpe_1arg!check_users
+    use: generic-service
+-   hostgroup_name: linux-servers
+    service_description: Disk
+    check_command: check_nrpe_1arg!check_root
+    use: generic-service
+-   hostgroup_name: linux-servers
+    service_description: Firewall
+    check_command: check_nrpe_1arg!check_firewall
+    use: generic-service
+-   hostgroup_name: mysql-servers
+    service_description: MySQL
+    check_command: check_nrpe_1arg!check_mysql
+    use: generic-service
+-   hostgroup_name: smtp-servers
+    service_description: SMTP
+    check_command: check_nrpe_1arg!check_smtp
+    use: generic-service
+-   hostgroup_name: haproxy-servers
+    service_description: HAProxy
+    check_command: check_nrpe_1arg!check_haproxy
+```
+
+##### Contacts
+
+Here are our contacts. Note the htpasswd attribute per contact. This will get injected into the `/etc/nagios3/htpasswd.users` file via the htpasswd template.
+
+Consider putting this one in <a href="/blog/sops-with-terraform-and-ansible/"> a SOPS yaml file</a> since it contains (hashed) passwords.
+
+```
+nagios_contacts:
+-   slug: miguel
+    email: mig@example.com
+    service_notification_period: 24x7
+    host_notification_period: 24x7
+    service_notification_options: w,u,c,r
+    host_notification_options: d,r
+    service_notification_commands: notify-service-by-email,notify-service-by-pushover
+    host_notification_commands: notify-host-by-email,notify-host-by-pushover
+    pushover_userkey: xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    pushover_appkey: xxxxxxxxxxxxxxxxxxxxxxxx
+    htpasswd: $apr1$eZT4f0GX$SZmie6ILjIfgdBHK/SDAK1
+-   slug: alice
+    email: alice@example.com
+    service_notification_period: 24x7
+    host_notification_period: 24x7
+    service_notification_options: w,u,c,r
+    host_notification_options: d,r
+    service_notification_commands: notify-service-by-email
+    host_notification_commands: notify-host-by-email
+    htpasswd: $apr1$W27m.e/g$6oKLiM5AM3DdXDPAgr4gp1
+-   slug: bob
+    email: bob@example.com
+    service_notification_period: 24x7
+    host_notification_period: 24x7
+    service_notification_options: w,u,c,r
+    host_notification_options: d,r
+    service_notification_commands: notify-service-by-email
+    host_notification_commands: notify-host-by-email
+    htpasswd: $apr1$9epOfi.p$EMTHFHOYHvCajyBmOannR1
+nagios_contactgroups:
+-   slug: sysadmins
+    alias: System Administrators
+    members: miguel
+-   slug: developers
+    alias: Developer team alerts
+    members: alice,bob
+```
+
+That's essentially it! Having abstracted out the Nagios configs into lean templates, we can manage the important Nagios objects purely via the Ansible inventory.
