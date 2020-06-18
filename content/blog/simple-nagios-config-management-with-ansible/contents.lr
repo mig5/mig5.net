@@ -118,6 +118,16 @@ define contactgroup{{ "{" }}
 {% endfor %}
 ```
 
+##### htpasswd.users
+
+This is the htpasswd file. Note how we extract the username and password from the `nagios_contacts` in the inventory. This means we are only managing 'user' attributes in one place in the inventory. You could do similar things with the ACLs in the Nagios `cgi.cfg`.
+
+```
+{% for nagios_contact in nagios_contacts %}
+{{ nagios_contact.slug }}:{{ nagios_contact.htpasswd }}
+{% endfor %}
+```
+
 ##### hostgroups.cfg
 
 A list of hostgroups
