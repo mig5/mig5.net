@@ -166,6 +166,8 @@ I quite cheerfully acknowledge that it's incredibly crude - but then, so is Basi
 
 I also consider this to be pretty much as secure as Basic Auth, which works post-auth by sending an `Authentication` header with the hashed credentials in subsequent requests. There isn't too much difference between this and sending a cookie with some hard-to-guess value: the Authentication header could just as easily be forged in a malicious request if it was guessable.
 
+The point of this post is to show you how you can make a custom auth app and integrate it with `auth_request`, without having to consider a 3rd party IDP which might not be feasible. For a production-ready app, of course you could extend the example above to authenticate multiple users from a backend database, or add two-factor auth somehow, etc, to bolster it a bit more..
+
 Secondly, note one subtle requirement: the cookie is set on the whole domain `.example.com`. This is important because Nginx needs to pass that cookie in the request to the auth server, and if the 'frontend' app and the auth server aren't on the same domain, the cookie doesn't get sent! At least, not in my tests. So make sure you put your auth server on a subdomain that is on the same domain as the frontend app.
 
 Finally, note that the use of something like `auth_request` means your auth server becomes a new single point of failure in the authentication chain, which didn't previously exist with a Basic Authentication solution.
