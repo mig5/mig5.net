@@ -1,0 +1,175 @@
+title: HTTP Basic Auth alternative with Nginx auth_request and a custom auth form
+---
+pub_date: 2020-06-19
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+sysadmin
+nginx
+authentication
+
+---
+body:
+
+This was a strange one, but a customer has been building some apps for *their* customer to consume. As is pretty typical, a staging environment was set up, with HTTP basic auth over it to prevent crawlers and other unauthorised access to the staging env.
+
+It needs to be noted that the customer's customer is in a variety of locations without any common office or network endpoint that would allow us to allow access based on their IP address. They also lacked the permission to install, say, OpenVPN clients, to connect to a (Linux based) VPN under our control.
+
+In addition, we can't use some other sort of Identity Provider to grant auth (e.g Vouch with Github oAuth, or Google, Facebook login, etc) because there is no guarantee that each user at the organisation has an account with that IDP.
+
+In scenarios like that, HTTP basic auth (aka 'htpasswd') is a really simple way to share a 'pre-shared key' or set of credentials that don't need to be unique per user, just purely operating as a gatekeeper to keep other people or bots off the service.
+
+However, that organisation is a large bureaucratic one with an enterprise-y Microsoft-based I.T department. This has nothing to do with the app being built, except that that I.T department do control what their staff's laptops are able to do, how their browsers are configured, etc etc.
+
+And it turns out that <a href="https://www.vansurksum.com/2020/03/01/microsoft-is-going-to-disable-basic-legacy-authentication-for-exchange-online-what-does-that-actually-mean-and-does-that-impact-me/">Microsoft is disabling basic authentication</a>. 
+
+That article talks about it specific to Exchange Online, but it is somehow related to this organisation's adoption of such policies. It sounds as if they took that policy and applied it to the browser as a whole in their centrally-managed policy. Don't ask me how this works, I'm not a Microsoft sysadmin.
+
+So one day HTTP Basic auth stopped working on the app *we* host, for these end users, because their browser wouldn't allow it.
+
+Since the organisation doesn't believe in locking down a staging environment or putting all their users behind a VPN of which they could provide us an IP address to grant access for, it fell to me to implement a workaround.
+
+#### Introducing Nginx auth_request
+
+I had been playing with <a href="https://github.com/vouch/vouch-proxy">Vouch</a> a lot in the last 12 months. It's a really great bit of middleware that will delegate auth off to an oAuth or OIDC based IDP on behalf of an app (Service Provider/SP/Relying Party/RP, whatever you want to call it).
+
+It's this sort of authentication that Microsoft wants to encourage people to move to ('Modern Authentication' as it calls it), and I totally understand the reasoning.
+
+But as I said, in this case, there was no common IDP we could rely on, nor was a VPN or firewall solution viable. Nonetheless, since I understood Vouch, I already knew about Nginx's <a href="https://docs.nginx.com/nginx/admin-guide/security-controls/configuring-subrequest-authentication/">`auth_request`</a> feature which is how Vouch is usually integrated.
+
+`auth_request` works by telling a specific `location` in your Nginx config that it requires a subrequest be made to another route, e.g `/auth`, which in turn typically does a `proxy_pass` to some sort of authentication server (this would normally be Vouch if you were using it).
+
+#### A crude replacement for the Basic Auth popup - a HTML/PHP form
+
+In my case, I realised I could delegate that 'auth server' off to an *extremely* simple (well... crude) custom HTML/PHP form which requires a username/pass, just like HTTP Basic Auth, except without the popup that the company's browsers would block.
+
+The form then needs to set a cookie on a successful form submission, and returns to the app.
+
+Subsequent requests still pass to the login form, but if the cookie is present it quickly returns a code 200 and Nginx understands the user is still authenticated.
+
+#### Show me some code!
+
+Here's the HTML/PHP form:
+
+```
+<?php
+session_start();
+$error = "";
+$authenticated = false;
+$cookie_name = "SomeSortOfAuthCookieName";
+$cookie_value = "AReallyLongRandomCookieValueThatWouldBeVeryHardToForgeOrAtLeastAsHardAsForgingABasicAuthHeader";
+$cookie_domain = ".example.com";
+$user = 'foobar';
+$pass = 'barfoo';
+
+if(isset($_COOKIE[$cookie_name]) && $_COOKIE[$cookie_name] == $cookie_value) {
+  $authenticated = true;
+}
+if(isset($_POST["submit"])) {
+  $authenticated = $_POST["username"] == $user && $_POST["password"] == $pass;
+  if(!$authenticated) {
+    $error = "Invalid username or password.";
+  }
+  else {
+    setcookie($cookie_name, $cookie_value, time() + (86400 * 30), "/", $cookie_domain);
+    header("Location: https://" . $_POST["return"]);
+  }
+}
+if($authenticated) {
+   header("X-CustomAuth: authenticated", true, 200);
+} else {
+  header("X-CustomAuth: unauthenticated", true, 401);
+}
+if (isset($_GET['auth'])) { ?>
+<!DOCTYPE html>
+<html>
+   <head>
+     <title>Authentication Required</title>
+     <meta http-equiv='content-type' content='text/html;charset=utf-8' />
+     <meta charset="utf-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1">
+     <link rel="stylesheet" href="/css/bootstrap.min.css">
+   </head>
+<body>
+  <div class="container">
+    <h3 class="text-center">Authentication Required</h3>
+    <form name="input" action="" method="post">
+      <div class="form-group">
+        <label for="username">Username:</label><input type="text" value="" id="username" name="username" class="form-control"/>
+      </div>
+      <div class="form-group">
+        <label for="password">Password:</label><input type="password" value="" id="password" name="password" class="form-control"/>
+      </div>
+     <input type="hidden" id="return" name="return" value=<?php echo $_GET['return'] ?>> 
+      <div class="error"><?= $error ?></div>
+      <button type="submit" name="submit" class="btn btn-default">Login</button>
+    </form>
+  </div>
+</body>
+</html>
+<?php } ?>
+```
+
+Create a stock standard Nginx or Apache vhost for serving this simple one-page `index.php` file. I won't bother showing that here, there's nothing special about serving an index.php and plenty of examples exist online.
+
+
+But here are the pertinent parts of the Nginx vhost for the *actual frontend web app* that depends on this auth provider:
+
+```
+server {
+        server_name someapp.example.com;
+        # [.... listen port, ssl_parameters, etc ....]
+
+        location / {
+          auth_request     /auth;
+          auth_request_set $saved_set_cookie $upstream_http_set_cookie;
+          # [.... other logic for serving this frontend web app e.g try_files etc ....]
+        }
+
+        error_page 401 = @login;
+        location @login {
+          return 302 https://auth.example.com/index.php?auth&return=$http_host;
+        }
+
+        location = /auth {
+            proxy_pass              https://auth.example.com/index.php;
+            proxy_pass_request_body off;
+            proxy_set_header        Content-Length "";
+            proxy_set_header        X-Original-URI $request_uri;
+        }
+
+        # [.... other non-relevant nginx config for this webapp as required ....]
+}
+```
+
+What happens here is that the request to the app is passed to a subrequest via the `auth_request` feature. This loads the `/auth` route which proxies to the 'auth server' - that is the HTML/PHP form we made above, and is served at https://auth.example.com.
+
+If it was a GET request and there was no cookie present, the auth page throws a 401 response back (authentication required).
+
+Nginx notices the 401 and fires its `error_page 401` logic, which again takes the user to the auth server with a 302 redirect, this time with the query parameter `?auth` and a `return` query to reference the URL of the frontend app itself.
+
+The user is shown a HTML form and gets the opportunity to enter the credentials.
+
+On a successful submission of the form, the cookie is set, and the form redirects the user back to the original app (which it knows thanks to the `return` parameter).
+
+Now Nginx passes the request to the auth server again, but because the cookie is set, a code 200 is quickly sent back and the app is shown (`auth_request` understands that if it gets a 200 code response, to end the subrequest and pass the user on to the real app).
+
+Phew! It's a little convoluted, but it works.
+
+#### Caveats
+
+I quite cheerfully acknowledge that it's incredibly crude - but then, so is Basic Auth. I kind of understand why it's being deprecated, but it's still useful in some contexts.
+
+I also consider this to be pretty much as secure as Basic Auth, which works post-auth by sending an `Authentication` header with the hashed credentials in subsequent requests. There isn't too much difference between this and sending a cookie with some hard-to-guess value: the Authentication header could just as easily be forged in a malicious request if it was guessable.
+
+Secondly, note one subtle requirement: the cookie is set on the whole domain `.example.com`. This is important because Nginx needs to pass that cookie in the request to the auth server, and if the 'frontend' app and the auth server aren't on the same domain, the cookie doesn't get sent! At least, not in my tests. So make sure you put your auth server on a subdomain that is on the same domain as the frontend app.
+
+Finally, note that the use of something like `auth_request` means your auth server becomes a new single point of failure in the authentication chain, which didn't previously exist with a Basic Authentication solution.
+
+But since this example is a 'stateless' app, it is easily able to be load-balanced if you run multiple instances of it. In my case, it runs as a simple Docker container in Amazon ECS, which means multiple tasks can be created and stored in a target group behind an internal ALB. And in any case, if the container stops, ECS will automatically start a new one in its place.
+
+
