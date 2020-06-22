@@ -1,103 +1,88 @@
 html, body {
-	line-height: 2;
-	margin: 0;
-	padding: 0;
-	background: #fafafa;
+  line-height: 2;
+  margin: 0;
+  background: #ffffff;
 }
 
 html, body, input, textarea, select {
-	font-family: 'Arial, Helvetica', sans-serif;
-	color: #444;
-	font-size: 16px;
+  font-family: 'Arial', Helvetica, sans-serif;
+  color: #333333;
+  font-size: 16px;
 }
 
 h1,
 h2,
 h3 {
-	margin-top: 10px;
-	margin-bottom: 10px;
-        text-align: center;
+  text-align: center;
 }
 
 h4,
-h5,
-h6 {
-	margin-top: 10px;
-	margin-bottom: 10px;
-	font-weight: 400;
+h5 {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-weight: 400;
 }
 
 h1 {
-	font-size: 70px;
+  font-size: 70px;
 }
 
 h2 {
-	font-size: 45px;
+  font-size: 45px;
 }
 
 h3 {
-	font-size: 32px;
+  font-size: 32px;
 }
 
 h4 {
-	font-size: 24px;
+  font-size: 24px;
 }
 
 h5 {
-	font-size: 18px;
-}
-
-h6 {
-	font-size: 12px;
-}
-
-p {
-	margin: 0 0 10px;
+  font-size: 18px;
 }
 
 a {
-	color: #428bca;
-	text-decoration: none;
+  color: #428bca;
+  text-decoration: none;
 }
 
 a:hover,
 a:focus {
-	color: #2a6496;
-	text-decoration: underline;
+  color: #2a6496;
+  text-decoration: underline;
 }
 
 .container {
-	width: 90%;
-	max-width: 1060px;
-	margin: 0 auto 0;
+  margin: 0 auto 0;
 }
 
 .clearfix:before,
 .clearfix:after,
 .container:before,
 .container:after {
-	content: " ";
-	display: table;
+  content: "";
+  display: table;
 }
 
 .clearfix:after,
 .container:after {
-	clear: both;
+  clear: both;
 }
 
 header {
-	padding-bottom: 60px;
+  padding-bottom: 60px;
 }
 
 nav li {
-	font-size: 1em;
-	margin: 0;
+  font-size: 1em;
+  margin: 0;
 }
 
 nav ul, nav li {
   margin: 0;
   padding: 0;
-  list-style: none;
   text-align: center;
 }
 
@@ -107,30 +92,27 @@ nav a {
   display: block;
   padding: 5px;
   color: #cccccc;
-  background-color: rgba(255,255,255,0.3);
   font-weight: 400;
 }
 
 nav a:hover {
   color: #333333;
+  background-color: #f2f2f2;
   text-decoration: none;
-  background-color: rgba(255,255,255,0.8);
 }
 
 .hero {
   background: #ef6713 no-repeat bottom center fixed;
-  background-color: #3f3f3f;
+  background-color: #f2f2f2;
   background-image: url("/static/img/izaak-berkeley-hurst-NQw_wJyAdac-unsplash.jpg");
   color: #f2f2f2;
   text-align: center;
-  padding: 0 0 40px 0;
+  padding: 0 0 20px 0;
 }
 
 .hero h1, .hero h2 {
-  display: block;
-  line-height: 1.2;
+  line-height: 1.0;
   margin: 0;
-  text-shadow: 0px 1px 1px rgba(0, 0, 0, 0.44);
 }
 
 .subheader {
@@ -140,61 +122,6 @@ nav a:hover {
 
 .frontpage {
   text-align: center;
-}
-
-footer {
-  background: #333333;
-}
-
-footer p {
-  text-align: center;
-  margin: 0;
-  color: #888;
-}
-
-section, footer {
-  padding: 45px 0;
-}
-
-textarea {
-  min-height: 170px;
-}
-
-@media only screen and (min-width: 725px) {
-
-	header h1 a {
-		padding: 2px 0;
-		background: none;
-	}
-
-	header {
-		padding-top: 70px;
-		width: 90%;
-		max-width: 1060px;
-		margin: 0 auto 0;
-	}
-
-	header h1 {
-		float: left;
-	}
-
-	nav {
-		text-align: center;
-		float: right;
-		border: 0;
-	}
-
-	nav li {
-		width: 100px;
-		margin: 0 5px;
-		display: inline-block;
-	}
-
-	nav a {
-		-webkit-border-radius: 2px;
-		   -moz-border-radius: 2px;
-			    border-radius: 2px;
-	}
 }
 
 .meta {
@@ -215,4 +142,53 @@ blockquote {
   border: 1px solid #ccc;
   box-sizing:border-box;
   padding: 10px;
+}
+
+footer {
+  background: #3f3f3f;
+}
+
+footer p {
+  text-align: center;
+  margin: 0;
+  color: #888;
+}
+
+section, footer {
+  padding: 50px 0;
+}
+
+textarea {
+  min-height: 170px;
+}
+
+@media only screen and (min-width: 725px) {
+  header h1 a {
+   padding: 2px 0;
+   background: none;
+  }
+  header {
+    padding-top: 70px;
+    width: 90%;
+    max-width: 1060px;
+    margin: 0 auto 0;
+  }
+  header h1 {
+    float: left;
+  }
+  nav {
+    text-align: center;
+    float: right;
+    border: 0;
+  }
+  nav li {
+    width: 100px;
+    margin: 0 5px;
+    display: inline-block;
+  }
+  nav a {
+    -webkit-border-radius: 2px;
+    -moz-border-radius: 2px;
+    border-radius: 2px;
+  }
 }
