@@ -1,0 +1,84 @@
+title: OpenVPN 2.4 rejects client connections when "CRL has expired"
+---
+pub_date: 2020-06-22
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+sysadmin
+authentication
+openvpn
+infosec
+
+---
+body:
+
+Had a surprise on the weekend when a customer's OpenVPN server suddenly started rejecting connections from clients (or refreshing clients that were already connected), which set off a flurry of Nagios alerts.
+
+Upon investigation, I found the smoking gun in the OpenVPN server's syslogs:
+
+```
+Jun 19 23:59:14 xxxxxxxxxx ovpn-server[1458]: xx.xx.xx.xx:xxxxx VERIFY ERROR: depth=0, error=CRL has expired: C=XX, ST=XXXXXXX, L=XXXXXXX, O=XXXXXXX, OU=XX, CN=XXXX, name=XXXXX, emailAddress=XXXXXXXXXXXXXXX
+```
+
+The CRL is the 'Certificate Revocation List'. If you revoke a key signed by the OpenVPN CA using the typical helper script from the `easy-rsa` package, such as `revoke-full`, it will generate a `crl.pem` file. This can be passed in the OpenVPN configuration with `crl-verify /path/to/crl.pem`, which makes the OpenVPN server check that the connecting client is using a key that is still signed and valid. If a client tries to connect but the CRL says it was revoked, the connection will be refused.
+
+Inspecting the CRL can be done with this command:
+
+```
+openssl crl -inform PEM -text -noout -in  crl.pem
+```
+
+The 'expiry' line would look like this (it's not obvious that it's an expiry!):
+
+```
+Next Update: Jun 19 22:18:49 2020 GMT
+```
+
+#### Generating a new CRL
+
+A lot of guides online show an easy way to generate a CRL with this command:
+
+```
+./easyrsa gen-crl
+```
+
+But this really depends on how you set up your OpenVPN. In my case, this was an Ubuntu server, and there is no `easyrsa` command.
+
+Really this command is just a wrapper around an OpenSSL command. I ended up doing it like this:
+
+```
+openssl ca -gencrl -keyfile keys/ca.key -cert keys/ca.crt -out keys/crl.pem -config $KEY_CONFIG
+```
+
+The `$KEY_CONFIG` seemed to be necessary, and this file mapped to the `openssl-1.0.0.cnf` file alongside the other helper files such as `build-key`, `vars`, `revoke-full`, etc.
+
+I had to comment out or set to `""` a few variables in the `openssl-1.0.0.cnf` file because the command was erroring due to expecting other `ENV` environment variables that had not been setup, such as `commonName_default = CommonName $ENV::KEY_CN` and `subjectAltName=$ENV::KEY_ALTNAMES`, even though I had already 'sourced' the `./vars` file.
+
+Another method of regenerating the CRL avoids errors but requires you to generate a new cer/key pair. Generate a new 'client' with `./build-key` and then run the `./revoke-full` script to revoke it. This will also generate a new CRL with an updated expiry.
+
+#### Overriding the expiry date
+
+It seems that the default expiry is 30 days, which is very short! This is different to the `KEY_EXPIRE` and `CA_EXPIRE` values in the `vars` config, which are often set to 3650 days (10 years). The CRL's expiry seems to be set in that same `openssl-x.x.x.cnf` file with the attribute `default_crl_days= 30`.
+
+My command above, I think, will not set an expiry, so that's something to consider. An expiry is probably a good thing.
+
+#### But why has this started to happen?
+
+What confused me the most was that this customer runs about 5 separate OpenVPN servers, all with CRLs in place. In fact, each OpenVPN server even had CRLs generated on the same day, as a key was revoked from each OpenVPN on that day And each of those CRLs seemed to have the same expiry ('Next Update') field in it.
+
+So why was only one VPN server rejecting connections due to the expired CRL?
+
+After a bit of digging, it appears that this is a change in OpenVPN 2.4. The other servers were running OpenVPN 2.3.
+
+The <a href="https://community.openvpn.net/openvpn/wiki/ChangesInOpenvpn24">changelog</a> does not mention it explicitly (though it does talk about 'crl refactoring'), but <a href="https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=849909#10">other reports</a> explain it, as does <a href="https://community.openvpn.net/openvpn/wiki/CertificateRevocationListExpired">this official wiki page</a>:
+
+> Specifically, the Crypto Library (Usually OpenSSL) will [now] check all fields, this check includes the nextUpdate field and CRLs with an expired nextUpdate field are flagged as expired by OpenSSL (The built-in check in OpenVPN 2.3 did not check this field). 
+
+So that's why.
+
+A default expiry of 30 days seems too low if you don't have any processes in place to regularly regenerate it. You could perhaps regenerate it automatically via a cron, but that sort of procedure is just as mindless as extending the default expiry. The latter seems to be the popular approach.
+
