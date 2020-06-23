@@ -3,6 +3,7 @@
   {% if from_index %}
     <h4><a href="{{ post|url }}">{{ post.title }}</a></h4><p class="meta">{{ post.pub_date }}</p>
   {% else %}
+    <p class="meta"><a href="/blog/">< Go back </a></p>
     <h4>{{ post.title }}</h4>
   <p class="meta">
     written by
