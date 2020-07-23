@@ -99,7 +99,7 @@ What we are doing here is:
  * Iterate over the 'attributes' in the Finding's JSON object to see what TCP or UDP ports were found to be 'open', and append them to a list.
  * If the port found is in the allowed ports list, remove it from the 'found ports' list
  * Special case for UDP - in my case, I'm allowing UDP port 1194 on a VPN machine, but that VPN machine also serves a HTTPS site, which is why it's in the same main conditional..
- * If there are no ports left over in the list of found ports (e.g we've removed all the ports because they were all allowed), exit early from the Lambfa function
+ * If there are no ports left over in the list of found ports (e.g we've removed all the ports because they were all allowed), exit early from the Lambda function
  * If anything else happens (the implication is either: the finding was on a server that wasn't in our expected list, or it was but the port that was found was not in the allowed list), then carry on with the rest of the script that sends the alert to the SNS topic (and you'll probably get an e-mail, or it goes to a chat room, whatever)
 
 
