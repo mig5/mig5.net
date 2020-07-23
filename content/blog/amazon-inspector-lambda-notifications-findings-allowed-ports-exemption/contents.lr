@@ -36,7 +36,13 @@ Ideally, you could set a mapping of allowed ports/protocols per EC2 instance, an
 
 #### Why would you want to ignore findings?
 
-Lucky you, sounds like you've not experienced monitoring/alert fatigue before. It is really tiring to get weekly scan results that show the same thing 99% of the time if you know it can be ignored. Then you *do* start ignoring the weekly alerts. Then you miss something important on that 1% of times, and it turns into a big drama once you finally notice.
+Lucky you, sounds like you've not experienced monitoring/alert fatigue before. 
+
+It is really tiring to get weekly scan results that show the same thing 99% of the time if you know it can be ignored. 
+
+Then you *do* start ignoring the weekly alerts. 
+
+Then you miss something important on that 1% of times, and it turns into a big drama once you finally notice.
 
 
 #### Using Lambda to customise notifications of findings to an SNS topic
@@ -91,8 +97,8 @@ What we are doing here is:
  * Iterating over the Name tag of each EC2 instance, to set the server_name.
  * If the server in question (that has triggered this finding) matches a certain subset of server names that are 'allowed' to run services on ports accessible to the internet, set the expected list of tcp or udp allowed ports for this subset of 'special servers'
  * Iterate over the 'attributes' in the Finding's JSON object to see what TCP or UDP ports were found to be 'open', and append them to a list.
- * If the port found is in the allowed port, remove it from the list
- * Special case for UDP - in my case, I'm allowing UDP port 1194 on a VPN machine.
+ * If the port found is in the allowed ports list, remove it from the 'found ports' list
+ * Special case for UDP - in my case, I'm allowing UDP port 1194 on a VPN machine, but that VPN machine also serves a HTTPS site, which is why it's in the same main conditional..
  * If there are no ports left over in the list of found ports (e.g we've removed all the ports because they were all allowed), exit early from the Lambfa function
  * If anything else happens (the implication is either: the finding was on a server that wasn't in our expected list, or it was but the port that was found was not in the allowed list), then carry on with the rest of the script that sends the alert to the SNS topic (and you'll probably get an e-mail, or it goes to a chat room, whatever)
 
