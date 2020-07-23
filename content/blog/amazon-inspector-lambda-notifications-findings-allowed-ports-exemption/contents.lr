@@ -1,0 +1,111 @@
+title: Ignoring 'allowed' ports in Amazon Inspector findings, with Lambda and SNS
+---
+pub_date: 2020-07-23
+---
+author: mig5
+---
+mastodon_handle: mig5
+---
+tags:
+
+sysadmin
+infosec
+aws
+monitoring
+risk
+
+---
+body:
+
+If you don't know about <a href="https://aws.amazon.com/inspector/">Amazon Inspector</a>, it's a managed AWS service which can scan your EC2 instances for vulnerabilities, and Security Groups for open ports accessible from the internet.
+
+I am particularly interested in the latter in order to proactively monitor that no-one in an ops team accidentally leaves a port open via Security Groups without noticing (for a long time).
+
+The tool works well (although it is hard to Terraform because there's no built-in logic to set the Inspector assessment template's 'schedule' from within Terraform, or link it to an SNS topic, so I did it by hand in the end). Particularly for the 'Network' scan (open ports), this is a built-in rule suite, you don't have to configure it.
+
+AWS inspector runs the template and reports any Findings. It also grades the Findings in terms of perceived severity. For example, port 80 and 443 being open to the world is considered 'Low', while SSH (even if it is locked down to a specific source IP address) is graded Medium. I haven't got anything that represents a High grade :)
+
+#### Problems I've found with the design of AWS Inspector
+
+Part of the annoyance is that even if the port is locked down to a specific allowed bastion IP or client office IP for something like SSH or HTTPS (e.g a staging site), not 0.0.0.0/0, AWS still will report this as a finding. I guess it makes sense, it's about whether the 'outside' can access, whether or not that's a curated, vetted outsider.
+
+But the main problem with AWS Inspector is that there is no way to set an 'allowed' list of ports (or source IPs in the ACL) that you *expect* to be open, and so to exclude from the findings.
+
+Ideally, you could set a mapping of allowed ports/protocols per EC2 instance, and have the inspector compare what it finds with what's 'allowed', and move on if it's allowed.
+
+
+#### Why would you want to ignore findings?
+
+Lucky you, sounds like you've not experienced monitoring/alert fatigue before. It is really tiring to get weekly scan results that show the same thing 99% of the time if you know it can be ignored. Then you *do* start ignoring the weekly alerts. Then you miss something important on that 1% of times, and it turns into a big drama once you finally notice.
+
+
+#### Using Lambda to customise notifications of findings to an SNS topic
+
+Rather than directly subscribe an email address to the SNS topic that the AWS inspector reports findings to, you can subscribe a Lambda function to that SNS topic. You can then use the Lambda function to do a bit more customisation of the findings before sending *those* results to a second SNS topic. The second SNS topic is then something you'd want to subscribe a human or bot to, to consume those filtered or formatted messages.
+
+For writing such a Lambda function, there is already <a href="https://aws.amazon.com/blogs/aws/scale-your-security-vulnerability-testing-with-amazon-inspector/">a guide that was written in 2016 on AWS' blog</a> and it still works.
+
+
+This Lambda function is simple, it just sends a slightly customised message for every Finding from the inspector, but it doesn't do any further filtering or formatting.
+
+#### Filtering allowed ports
+
+<a href="https://gist.github.com/mig5/e3ff9c6ab08be0a2b342f22b77899563">Here is my slightly modified (hacky) version of the script</a> from that blog post.
+
+The key part that I added, is this section (lines 55 - 81):
+
+```
+    # Get the server name from tag
+    server_name = ""
+    for tags in finding['assetAttributes']['tags']:
+        if tags['key'] == 'Name':
+            server_name = tags['value']
+
+    # If the server is expected to run certain public ports, ignore these from the findings
+    if server_name in ['webapps (Prod)', 'vpn.foobar.com', 'brochure-pet-server.foobar.com', 'public-staging-site-pw-protected.foobar.com']:
+        tcp_allowed = [ '80', '443', '[[80 - 80], [443 - 443]]' ]
+        udp_allowed = [ '1194', '[[1194 - 1194]]' ]
+        ports = []
+        
+        for tags in finding['attributes']:
+            if tags['key'] == 'TCP_PORTS' or tags['key'] == 'UDP_PORTS' or tags['key'] == 'PORT':
+                if tags['value'] != "[]":
+                    ports.append(tags['value'])
+        for port in ports:
+            if port in tcp_allowed:
+                print('Skipping finding: ', title)
+                ports.remove(port)
+        for port in ports:
+            if port in udp_allowed and server_name == 'vpn.foobar.com':
+                print('Skipping finding: ', title)
+                ports.remove(port)
+        if len(ports) == 0:
+            print('No findings worthy of reporting')
+            return 1
+```
+
+#### What's going on here?
+
+What we are doing here is:
+
+ * Iterating over the Name tag of each EC2 instance, to set the server_name.
+ * If the server in question (that has triggered this finding) matches a certain subset of server names that are 'allowed' to run services on ports accessible to the internet, set the expected list of tcp or udp allowed ports for this subset of 'special servers'
+ * Iterate over the 'attributes' in the Finding's JSON object to see what TCP or UDP ports were found to be 'open', and append them to a list.
+ * If the port found is in the allowed port, remove it from the list
+ * Special case for UDP - in my case, I'm allowing UDP port 1194 on a VPN machine.
+ * If there are no ports left over in the list of found ports (e.g we've removed all the ports because they were all allowed), exit early from the Lambfa function
+ * If anything else happens (the implication is either: the finding was on a server that wasn't in our expected list, or it was but the port that was found was not in the allowed list), then carry on with the rest of the script that sends the alert to the SNS topic (and you'll probably get an e-mail, or it goes to a chat room, whatever)
+
+
+#### Caveats
+
+There are probably nicer ways of building up this list. Maybe instead of hardcoding them in the Lambda function, we could set a list of allowed ports as a Tag on the EC2 instance, and simply parse that list straight from the Tag.
+
+The other caveat is where you have a microservices architecture and the frontend apps themselves also run as Docker containers on ECS, meaning their port is proxied through from an ALB to a high-numbered Docker-like port in the 32768-60999 range. This ends up appearing in the Findings as an 'aggregate' result, in the sense that even though the backend ECS cluster is not directly accessible, the open port 443 on the ALB, is forwarding traffic to the Docker port via a Target Group and so one way or another it *is* reachable.
+
+What I would like to do is somehow filter out the high-numbered Docker ports from the ECS cluster, but I haven't found a way to sensibly parse something like [[ 32XXX  - 32XXX ]] which is how the port 'attribute' is represented, when the ports are somewhat random (they change all the time whenever the ECS task is re-deployed). I think I would need to split up the results in that block and see if it is within range(32768, 60999). Even then, though, some malware uses high-numbered (unprivileged) ports, so I might want to know. This, therefore, might be a little bit of the 'alert fatigue' that I may have to settle with fighting against.
+
+
+Anyway, that's my crude attempt at filtering out 'allowed' open ports. I (somehow) didn't find anyone smarter than I am going to this level of customisation of the Findings via Lambda, so I hacked on the example instead.
+
+
