@@ -10,4 +10,3 @@ target = rsync://miguel@wolverine.mig5.net/opt/www/mig5.net?delete
 
 [packages]
 lektor-tags = 0.3
-lektor-simplemde = 0.5
